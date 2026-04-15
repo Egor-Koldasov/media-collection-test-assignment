@@ -50,7 +50,7 @@ export function MediaCard({ item }: MediaCardProps) {
       <button
         type="button"
         aria-label={`Remove ${item.name}`}
-        className="pointer-events-none absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/55 bg-[rgba(12,22,30,0.58)] text-white/92 opacity-0 shadow-[0_12px_28px_rgba(8,16,24,0.28)] backdrop-blur-md transition duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 hover:scale-105 hover:border-white/80 hover:bg-[rgba(12,22,30,0.74)] hover:text-white focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 focus-visible:ring-offset-2 focus-visible:ring-offset-ink/20"
+        className="pointer-events-none absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[rgba(12,22,30,0.58)] text-white/92 opacity-0 backdrop-blur-xs transition duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 hover:scale-105 hover:bg-[rgba(12,22,30,0.74)] text-gray-300 hover:text-white focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 focus-visible:ring-offset-2 focus-visible:ring-offset-ink/20"
         onClick={() => dispatch(removeMediaRequested(item.id))}
       >
         <CloseIcon className="h-4 w-4" />
