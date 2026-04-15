@@ -2,6 +2,7 @@ import { PREVIEW_SIZE } from '../features/media/constants';
 import { isAbortError } from '../utils/errors';
 
 const MAX_PREVIEW_SCALE = 2;
+const HAVE_CURRENT_DATA = 2;
 
 function createAbortError(): DOMException {
   return new DOMException('Thumbnail generation was aborted.', 'AbortError');
@@ -206,12 +207,15 @@ async function generateVideoThumbnail(
   const video = document.createElement('video');
   video.muted = true;
   video.playsInline = true;
-  video.preload = 'metadata';
+  video.preload = 'auto';
 
   try {
     await new Promise<void>((resolve, reject) => {
       const cleanup = () => {
+        video.onloadedmetadata = null;
         video.onloadeddata = null;
+        video.onseeked = null;
+        video.oncanplay = null;
         video.onerror = null;
         signal.removeEventListener('abort', onAbort);
       };
@@ -222,7 +226,7 @@ async function generateVideoThumbnail(
       };
 
       signal.addEventListener('abort', onAbort, { once: true });
-      video.onloadeddata = () => {
+      video.onloadedmetadata = () => {
         cleanup();
         resolve();
       };
@@ -240,6 +244,58 @@ async function generateVideoThumbnail(
     if (!video.videoWidth || !video.videoHeight) {
       throw new Error('The selected video does not contain a readable frame.');
     }
+
+    const targetTime = Number.isFinite(video.duration) && video.duration > 0
+      ? Math.min(0.1, Math.max(video.duration - 0.001, 0))
+      : 0;
+
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        video.onloadeddata = null;
+        video.onseeked = null;
+        video.oncanplay = null;
+        video.onerror = null;
+        signal.removeEventListener('abort', onAbort);
+      };
+
+      const resolveFrame = () => {
+        cleanup();
+        resolve();
+      };
+
+      const onAbort = () => {
+        cleanup();
+        reject(createAbortError());
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+      video.onloadeddata = resolveFrame;
+      video.onseeked = resolveFrame;
+      video.oncanplay = resolveFrame;
+      video.onerror = () => {
+        cleanup();
+        reject(new Error('Could not read the first video frame.'));
+      };
+
+      if (
+        video.readyState >= HAVE_CURRENT_DATA &&
+        (!targetTime || Math.abs(video.currentTime - targetTime) < 0.001)
+      ) {
+        resolveFrame();
+        return;
+      }
+
+      if (targetTime > 0 && Math.abs(video.currentTime - targetTime) >= 0.001) {
+        video.currentTime = targetTime;
+        return;
+      }
+
+      if (video.readyState >= HAVE_CURRENT_DATA) {
+        resolveFrame();
+      }
+    });
+
+    assertNotAborted(signal);
 
     drawCover(
       context,
