@@ -1,8 +1,8 @@
-import { startTransition } from 'react';
+import { startTransition } from "react";
 
-import { useAppDispatch } from '../../../app/hooks';
-import { controlsActions } from '../controlsSlice';
-import type { SortBy, TypeFilter } from '../types';
+import { useAppDispatch } from "../../../app/hooks";
+import { controlsActions } from "../controlsSlice";
+import type { SortBy, TypeFilter } from "../types";
 
 interface MediaControlsProps {
   searchInput: string;
@@ -11,35 +11,28 @@ interface MediaControlsProps {
 }
 
 const filterOptions: Array<{ value: TypeFilter; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'image', label: 'Image' },
-  { value: 'video', label: 'Video' },
-  { value: 'document', label: 'Document' }
+  { value: "all", label: "All" },
+  { value: "image", label: "Image" },
+  { value: "video", label: "Video" },
+  { value: "document", label: "Document" },
 ];
 
 const sortOptions: Array<{ value: SortBy; label: string }> = [
-  { value: 'date', label: 'Newest' },
-  { value: 'size', label: 'Largest' }
+  { value: "date", label: "Newest" },
+  { value: "size", label: "Largest" },
 ];
 
 export function MediaControls({
   searchInput,
   typeFilter,
-  sortBy
+  sortBy,
 }: MediaControlsProps) {
   const dispatch = useAppDispatch();
 
   return (
-    <div className="flex flex-col gap-4 border-b border-ink/8 pb-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-1">
-          <p className="font-display text-[1.55rem] leading-none text-ink">Library</p>
-          <p className="text-sm text-ink/62">
-            Search loaded items, then narrow by type or size.
-          </p>
-        </div>
-
-        <label className="relative block w-full lg:max-w-[360px]">
+    <div className="flex flex-col gap-4 items-end">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between w-full lg:max-w-[360px]">
+        <label className="relative block w-full">
           <span className="sr-only">Search media</span>
           <input
             value={searchInput}
@@ -68,7 +61,7 @@ export function MediaControls({
         </label>
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
         <div className="flex flex-wrap gap-2">
           {filterOptions.map((option) => {
             const isActive = option.value === typeFilter;
@@ -77,13 +70,15 @@ export function MediaControls({
               <button
                 key={option.value}
                 type="button"
-                onClick={() => dispatch(controlsActions.setTypeFilter(option.value))}
+                onClick={() =>
+                  dispatch(controlsActions.setTypeFilter(option.value))
+                }
                 className={[
-                  'rounded-full px-3.5 py-2 text-sm transition',
+                  "rounded-full px-3.5 py-2 text-sm transition",
                   isActive
-                    ? 'bg-olive text-shell shadow-[0_12px_28px_rgba(47,119,109,0.22)]'
-                    : 'border border-ink/10 bg-white text-ink/70 hover:border-ink/18 hover:text-ink'
-                ].join(' ')}
+                    ? "bg-olive text-shell shadow-[0_12px_28px_rgba(47,119,109,0.22)]"
+                    : "border border-ink/10 bg-white text-ink/70 hover:border-ink/18 hover:text-ink",
+                ].join(" ")}
               >
                 {option.label}
               </button>
@@ -99,13 +94,15 @@ export function MediaControls({
               <button
                 key={option.value}
                 type="button"
-                onClick={() => dispatch(controlsActions.setSortBy(option.value))}
+                onClick={() =>
+                  dispatch(controlsActions.setSortBy(option.value))
+                }
                 className={[
-                  'rounded-full px-3.5 py-2 text-sm transition',
+                  "rounded-full px-3.5 py-2 text-sm transition",
                   isActive
-                    ? 'bg-white text-ink shadow-[0_8px_22px_rgba(22,33,40,0.1)]'
-                    : 'text-ink/62 hover:text-ink'
-                ].join(' ')}
+                    ? "bg-white text-ink shadow-[0_8px_22px_rgba(22,33,40,0.1)]"
+                    : "text-ink/62 hover:text-ink",
+                ].join(" ")}
               >
                 {option.label}
               </button>

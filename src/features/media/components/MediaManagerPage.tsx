@@ -1,18 +1,18 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
-import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { requestNextPage } from '../mediaSlice';
+import { useAppDispatch, useAppSelector } from "../../../app/hooks";
+import { requestNextPage } from "../mediaSlice";
 import {
   selectActiveUploadsCount,
   selectGalleryViewModel,
   selectSearchInput,
   selectSortBy,
   selectTypeFilter,
-  selectValidationIssues
-} from '../selectors';
-import { MediaControls } from './MediaControls';
-import { MediaGrid } from './MediaGrid';
-import { UploadPanel } from './UploadPanel';
+  selectValidationIssues,
+} from "../selectors";
+import { MediaControls } from "./MediaControls";
+import { MediaGrid } from "./MediaGrid";
+import { UploadPanel } from "./UploadPanel";
 
 export function MediaManagerPage() {
   const dispatch = useAppDispatch();
@@ -36,19 +36,18 @@ export function MediaManagerPage() {
       </div>
 
       <div className="relative mx-auto flex max-w-7xl flex-col gap-6">
-        <section className="rounded-[32px] border border-white/85 bg-[linear-gradient(145deg,rgba(255,255,255,0.99),rgba(242,247,251,0.94))] p-5 shadow-card backdrop-blur sm:p-6">
-          <UploadPanel
-            activeUploadsCount={activeUploadsCount}
-            validationIssues={validationIssues}
-          />
-        </section>
-
         <section className="rounded-[32px] border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(245,249,252,0.96))] p-5 shadow-card backdrop-blur sm:p-6">
-          <MediaControls
-            searchInput={searchInput}
-            sortBy={sortBy}
-            typeFilter={typeFilter}
-          />
+          <div className="flex border-b border-ink/8 pb-5 items-end gap-8 justify-between">
+            <UploadPanel
+              activeUploadsCount={activeUploadsCount}
+              validationIssues={validationIssues}
+            />
+            <MediaControls
+              searchInput={searchInput}
+              sortBy={sortBy}
+              typeFilter={typeFilter}
+            />
+          </div>
           <MediaGrid
             items={galleryViewModel.items}
             isInitialLoading={galleryViewModel.isInitialLoading}
