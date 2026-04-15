@@ -1,121 +1,34 @@
-import { useRef, useState, type DragEvent } from "react";
-
-import { useAppDispatch } from "../../../app/hooks";
-import {
-  ACCEPTED_UPLOAD_LABEL,
-  ACCEPTED_UPLOAD_TYPES,
-  MAX_FILES_PER_BATCH,
-} from "../constants";
-import { filesSelected } from "../mediaSlice";
+import { ACCEPTED_UPLOAD_LABEL, MAX_FILES_PER_BATCH } from "../constants";
 import type { UploadValidationIssue } from "../types";
 
 interface UploadPanelProps {
   activeUploadsCount: number;
   validationIssues: UploadValidationIssue[];
-}
-
-function toFileArray(fileList: FileList | null): File[] {
-  return fileList ? Array.from(fileList) : [];
+  onUploadClick: () => void;
 }
 
 export function UploadPanel({
   activeUploadsCount,
   validationIssues,
+  onUploadClick,
 }: UploadPanelProps) {
-  const dispatch = useAppDispatch();
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [isDragActive, setIsDragActive] = useState(false);
-
-  const submitFiles = (incoming: File[] | FileList | null) => {
-    const nextFiles = Array.isArray(incoming)
-      ? incoming
-      : toFileArray(incoming);
-
-    if (nextFiles.length === 0) {
-      return;
-    }
-
-    dispatch(filesSelected(nextFiles));
-
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
-  };
-
-  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setIsDragActive(false);
-    submitFiles(toFileArray(event.dataTransfer.files));
-  };
-
-  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
-    if (
-      event.relatedTarget instanceof Node &&
-      event.currentTarget.contains(event.relatedTarget)
-    ) {
-      return;
-    }
-
-    setIsDragActive(false);
-  };
-
   return (
-    <div className="flex gap-5 lg:items-center">
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept={ACCEPTED_UPLOAD_TYPES.join(",")}
-        className="hidden"
-        onChange={(event) => submitFiles(event.target.files)}
-      />
+    <div className="flex flex-col items-start gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="inline-flex items-center rounded-full bg-olive px-4 py-2 text-sm font-medium text-shell transition hover:bg-olive/90"
+          onClick={onUploadClick}
+        >
+          Upload
+        </button>
 
-      <div
-        className={[
-          "group relative overflow-hidden rounded-[28px] border px-5 py-4 transition max-w-xl",
-          isDragActive
-            ? "border-olive/45 bg-[#eef7fa] shadow-[0_0_0_1px_rgba(47,115,132,0.16)]"
-            : "border-ink/10 bg-white/84 shadow-inset",
-        ].join(" ")}
-        onClick={() => inputRef.current?.click()}
-        onDragEnter={() => setIsDragActive(true)}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setIsDragActive(true);
-        }}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
-      >
-        <div className="pointer-events-none absolute inset-x-5 top-4 h-px bg-gradient-to-r from-transparent via-ink/12 to-transparent" />
-        <div className="relative">
-          <div className="space-y-2">
-            <p className="text-sm text-ink/62">
-              Drop files here or choose them from your device.
-            </p>
-          </div>
-
-          <span className="text-sm mr-2">
-            JPEG, PNG, WEBP, MP4. Up to 5 files, 10 MB each.
+        {activeUploadsCount > 0 ? (
+          <span className="rounded-full border border-olive/16 bg-olive/8 px-3 py-1 text-xs font-medium text-olive">
+            {activeUploadsCount} uploading
+            {activeUploadsCount === 1 ? "" : "s"}
           </span>
-          <button
-            type="button"
-            className="inline-flex items-center rounded-full bg-olive px-4 py-2 text-sm font-medium text-shell transition hover:bg-olive/90"
-            onClick={(event) => {
-              event.stopPropagation();
-              inputRef.current?.click();
-            }}
-          >
-            Choose files
-          </button>
-        </div>
+        ) : null}
       </div>
 
       {validationIssues.length > 0 ? (

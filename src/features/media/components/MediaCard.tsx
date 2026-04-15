@@ -1,14 +1,19 @@
-import { useAppDispatch } from '../../../app/hooks';
-import { cancelUploadRequested, removeMediaRequested, retryUploadRequested } from '../mediaSlice';
-import type { MediaEntity } from '../types';
-import { formatFileSize, formatMediaType } from '../../../utils/formatters';
+import { useAppDispatch } from "../../../app/hooks";
+import {
+  cancelUploadRequested,
+  removeMediaRequested,
+  retryUploadRequested,
+} from "../mediaSlice";
+import type { MediaEntity } from "../types";
+import { formatFileSize, formatMediaType } from "../../../utils/formatters";
+import { CloseIcon } from "./icons/CloseIcon";
 
 interface MediaCardProps {
   item: MediaEntity;
 }
 
 function StatusBadge({ item }: { item: MediaEntity }) {
-  if (item.uploadState.status === 'uploading') {
+  if (item.uploadState.status === "uploading") {
     return (
       <span className="rounded-full bg-olive/12 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-olive">
         Uploading
@@ -16,7 +21,7 @@ function StatusBadge({ item }: { item: MediaEntity }) {
     );
   }
 
-  if (item.uploadState.status === 'done') {
+  if (item.uploadState.status === "done") {
     return (
       <span className="rounded-full bg-ink/8 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-ink/72">
         Done
@@ -24,7 +29,7 @@ function StatusBadge({ item }: { item: MediaEntity }) {
     );
   }
 
-  if (item.uploadState.status === 'error') {
+  if (item.uploadState.status === "error") {
     return (
       <span className="rounded-full bg-rust/10 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-rust">
         Error
@@ -38,27 +43,17 @@ function StatusBadge({ item }: { item: MediaEntity }) {
 export function MediaCard({ item }: MediaCardProps) {
   const dispatch = useAppDispatch();
   const uploadProgress =
-    item.uploadState.status === 'uploading' ? item.uploadState.progress : 0;
+    item.uploadState.status === "uploading" ? item.uploadState.progress : 0;
 
   return (
     <article className="group relative flex w-full max-w-[232px] flex-col gap-4 rounded-[28px] border border-ink/8 bg-white/90 p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-[0_24px_60px_rgba(22,36,45,0.11)]">
       <button
         type="button"
         aria-label={`Remove ${item.name}`}
-        className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-shell/92 text-ink/64 shadow-[0_8px_18px_rgba(22,33,40,0.12)] transition hover:text-ink"
+        className="pointer-events-none absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/55 bg-[rgba(12,22,30,0.58)] text-white/92 opacity-0 shadow-[0_12px_28px_rgba(8,16,24,0.28)] backdrop-blur-md transition duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 hover:scale-105 hover:border-white/80 hover:bg-[rgba(12,22,30,0.74)] hover:text-white focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 focus-visible:ring-offset-2 focus-visible:ring-offset-ink/20"
         onClick={() => dispatch(removeMediaRequested(item.id))}
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-        >
-          <path d="M6 6 18 18" strokeLinecap="round" />
-          <path d="M18 6 6 18" strokeLinecap="round" />
-        </svg>
+        <CloseIcon className="h-4 w-4" />
       </button>
 
       <div className="relative mx-auto h-[200px] w-[200px] overflow-hidden rounded-[22px] bg-[#edf4f7]">
@@ -69,7 +64,7 @@ export function MediaCard({ item }: MediaCardProps) {
           loading="lazy"
         />
 
-        {item.previewStatus.status === 'loading' ? (
+        {item.previewStatus.status === "loading" ? (
           <div className="absolute inset-0 flex items-center justify-center bg-ink/16 backdrop-blur-[1px]">
             <span className="h-9 w-9 animate-spin rounded-full border-2 border-white/60 border-t-white" />
           </div>
@@ -93,7 +88,7 @@ export function MediaCard({ item }: MediaCardProps) {
           </div>
         </div>
 
-        {item.uploadState.status === 'uploading' ? (
+        {item.uploadState.status === "uploading" ? (
           <div className="space-y-2.5">
             <div className="h-1.5 overflow-hidden rounded-full bg-ink/8">
               <div
@@ -116,7 +111,7 @@ export function MediaCard({ item }: MediaCardProps) {
           </div>
         ) : null}
 
-        {item.uploadState.status === 'error' ? (
+        {item.uploadState.status === "error" ? (
           <div className="space-y-2 rounded-[18px] border border-rust/15 bg-rust/6 p-3">
             <p className="text-sm leading-snug text-rust">
               {item.uploadState.message}
