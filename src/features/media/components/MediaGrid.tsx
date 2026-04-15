@@ -75,6 +75,8 @@ export function MediaGrid({
   const dispatch = useAppDispatch();
   const collectionRef = useRef<HTMLDivElement | null>(null);
   const [overlayRect, setOverlayRect] = useState<OverlayRect | null>(null);
+  const gridClassName =
+    "grid justify-start gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),232px))]";
 
   useEffect(() => {
     if (!isCollectionDragActive) {
@@ -118,7 +120,7 @@ export function MediaGrid({
   }, [isCollectionDragActive]);
 
   const collectionContent = isInitialLoading ? (
-    <div className="grid justify-items-center gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+    <div className={gridClassName}>
       {Array.from({ length: 8 }, (_, index) => (
         <SkeletonCard key={index} />
       ))}
@@ -128,7 +130,7 @@ export function MediaGrid({
       {emptyMessage}
     </div>
   ) : (
-    <div className="grid justify-items-center gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+    <div className={gridClassName}>
       {items.map((item) => (
         <MediaCard key={item.id} item={item} />
       ))}
