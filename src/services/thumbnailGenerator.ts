@@ -1,6 +1,8 @@
 import { PREVIEW_SIZE } from '../features/media/constants';
 import { isAbortError } from '../utils/errors';
 
+const MAX_PREVIEW_SCALE = 2;
+
 function createAbortError(): DOMException {
   return new DOMException('Thumbnail generation was aborted.', 'AbortError');
 }
@@ -15,9 +17,10 @@ function createCanvasContext(): {
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
 } {
+  const outputSize = getPreviewOutputSize();
   const canvas = document.createElement('canvas');
-  canvas.width = PREVIEW_SIZE;
-  canvas.height = PREVIEW_SIZE;
+  canvas.width = outputSize;
+  canvas.height = outputSize;
 
   const context = canvas.getContext('2d');
 
@@ -25,7 +28,23 @@ function createCanvasContext(): {
     throw new Error('Canvas is not available in this browser.');
   }
 
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+
   return { canvas, context };
+}
+
+export function getPreviewScale(): number {
+  const deviceScale =
+    typeof window !== 'undefined' && Number.isFinite(window.devicePixelRatio)
+      ? window.devicePixelRatio
+      : 1;
+
+  return Math.max(1, Math.min(MAX_PREVIEW_SCALE, Math.ceil(deviceScale)));
+}
+
+export function getPreviewOutputSize(): number {
+  return PREVIEW_SIZE * getPreviewScale();
 }
 
 function cleanupCanvas(canvas: HTMLCanvasElement): void {
@@ -37,7 +56,8 @@ function drawCover(
   context: CanvasRenderingContext2D,
   source: CanvasImageSource,
   width: number,
-  height: number
+  height: number,
+  outputSize: number
 ): void {
   const targetRatio = 1;
   const sourceRatio = width / height;
@@ -63,8 +83,8 @@ function drawCover(
     sourceHeight,
     0,
     0,
-    PREVIEW_SIZE,
-    PREVIEW_SIZE
+    outputSize,
+    outputSize
   );
 }
 
@@ -79,10 +99,48 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 
         resolve(blob);
       },
-      'image/webp',
-      0.92
+      'image/png'
     );
   });
+}
+
+async function loadImageFromFile(
+  file: File,
+  signal: AbortSignal
+): Promise<{
+  image: HTMLImageElement;
+  sourceUrl: string;
+}> {
+  const sourceUrl = URL.createObjectURL(file);
+  const image = new Image();
+  image.decoding = 'async';
+
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      image.onload = null;
+      image.onerror = null;
+      signal.removeEventListener('abort', onAbort);
+    };
+
+    const onAbort = () => {
+      cleanup();
+      reject(createAbortError());
+    };
+
+    signal.addEventListener('abort', onAbort, { once: true });
+    image.onload = () => {
+      cleanup();
+      resolve();
+    };
+    image.onerror = () => {
+      cleanup();
+      reject(new Error('Could not load the image preview.'));
+    };
+
+    image.src = sourceUrl;
+  });
+
+  return { image, sourceUrl };
 }
 
 async function generateImageThumbnail(
@@ -93,49 +151,40 @@ async function generateImageThumbnail(
   const { canvas, context } = createCanvasContext();
 
   try {
-    if ('createImageBitmap' in window) {
-      const bitmap = await createImageBitmap(file);
-
+    if (typeof createImageBitmap === 'function') {
       try {
-        assertNotAborted(signal);
-        drawCover(context, bitmap, bitmap.width, bitmap.height);
-        return await canvasToBlob(canvas);
-      } finally {
-        bitmap.close();
+        const bitmap = await createImageBitmap(file);
+
+        try {
+          assertNotAborted(signal);
+          drawCover(context, bitmap, bitmap.width, bitmap.height, canvas.width);
+          return await canvasToBlob(canvas);
+        } finally {
+          bitmap.close();
+        }
+      } catch (error) {
+        if (isAbortError(error)) {
+          throw error;
+        }
       }
     }
 
-    const sourceUrl = URL.createObjectURL(file);
-    const image = new Image();
+    const { image, sourceUrl } = await loadImageFromFile(file, signal);
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        const cleanup = () => {
-          image.onload = null;
-          image.onerror = null;
-          signal.removeEventListener('abort', onAbort);
-        };
-
-        const onAbort = () => {
-          cleanup();
-          reject(createAbortError());
-        };
-
-        signal.addEventListener('abort', onAbort, { once: true });
-        image.onload = () => {
-          cleanup();
-          resolve();
-        };
-        image.onerror = () => {
-          cleanup();
-          reject(new Error('Could not load the image preview.'));
-        };
-
-        image.src = sourceUrl;
-      });
-
       assertNotAborted(signal);
-      drawCover(context, image, image.naturalWidth, image.naturalHeight);
+
+      if (!image.naturalWidth || !image.naturalHeight) {
+        throw new Error('Could not read the uploaded image dimensions.');
+      }
+
+      drawCover(
+        context,
+        image,
+        image.naturalWidth,
+        image.naturalHeight,
+        canvas.width
+      );
       return await canvasToBlob(canvas);
     } finally {
       URL.revokeObjectURL(sourceUrl);
@@ -192,7 +241,13 @@ async function generateVideoThumbnail(
       throw new Error('The selected video does not contain a readable frame.');
     }
 
-    drawCover(context, video, video.videoWidth, video.videoHeight);
+    drawCover(
+      context,
+      video,
+      video.videoWidth,
+      video.videoHeight,
+      canvas.width
+    );
     return await canvasToBlob(canvas);
   } finally {
     video.pause();

@@ -19,9 +19,15 @@ function SkeletonCard() {
   return (
     <div className="flex w-full max-w-[232px] flex-col gap-4 rounded-[28px] border border-ink/8 bg-white/75 p-4 shadow-card">
       <div className="mx-auto h-[200px] w-[200px] animate-pulse rounded-[22px] bg-[#edf4f8]" />
-      <div className="space-y-2">
-        <div className="h-4 w-4/5 animate-pulse rounded-full bg-[#e7eef3]" />
-        <div className="h-4 w-2/5 animate-pulse rounded-full bg-[#edf3f7]" />
+      <div className="space-y-3">
+        <div className="space-y-2">
+          <div className="h-4 w-4/5 animate-pulse rounded-full bg-[#e7eef3]" />
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-16 animate-pulse rounded-full bg-[#edf3f7]" />
+            <div className="h-4 w-12 animate-pulse rounded-full bg-[#edf3f7]" />
+          </div>
+        </div>
+        <div className="h-1.5 w-full animate-pulse rounded-full bg-[#edf3f7]" />
       </div>
     </div>
   );
@@ -41,10 +47,12 @@ export function MediaGrid({
 
   if (isInitialLoading) {
     return (
-      <div className="grid justify-items-center gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-        {Array.from({ length: 8 }, (_, index) => (
-          <SkeletonCard key={index} />
-        ))}
+      <div className="space-y-6 pt-5">
+        <div className="grid justify-items-center gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+          {Array.from({ length: 8 }, (_, index) => (
+            <SkeletonCard key={index} />
+          ))}
+        </div>
       </div>
     );
   }

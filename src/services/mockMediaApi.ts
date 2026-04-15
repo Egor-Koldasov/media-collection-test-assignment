@@ -7,23 +7,23 @@ import type {
 import { isAbortError } from '../utils/errors';
 
 const imageNames = [
-  'Atrium still',
-  'Material study',
-  'Campaign frame',
-  'Studio portrait',
-  'Field capture',
-  'Sample board',
-  'Lighting pass'
+  'Tabby sunbeam',
+  'Calico closeup',
+  'Whisker portrait',
+  'Paws on parade',
+  'Midnight zoomies',
+  'Snoozing loaf',
+  'Window watch'
 ];
 
 const videoNames = [
-  'Founder interview',
-  'Launch reel',
-  'Walkthrough clip',
-  'Assembly take',
-  'Showroom loop',
-  'Cutdown review',
-  'Motion test'
+  'Laser chase',
+  'Curtain ambush',
+  'Treat patrol',
+  'Zoomies montage',
+  'Cardboard kingdom',
+  'Tail flick loop',
+  'Sofa leap replay'
 ];
 
 const documentNames = [

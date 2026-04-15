@@ -1,6 +1,9 @@
+import { getPreviewScale } from './thumbnailGenerator';
+
 const DB_NAME = 'media-preview-cache';
 const STORE_NAME = 'thumbnails';
 const DB_VERSION = 1;
+const PREVIEW_CACHE_VERSION = 'v2';
 
 let databasePromise: Promise<IDBDatabase> | null = null;
 
@@ -48,7 +51,7 @@ async function openDatabase(): Promise<IDBDatabase | null> {
 }
 
 export function createPreviewCacheKey(file: Pick<File, 'name' | 'size'>): string {
-  return `${file.name}:${file.size}`;
+  return `${PREVIEW_CACHE_VERSION}:${getPreviewScale()}x:${file.name}:${file.size}`;
 }
 
 export async function getThumbnailBlob(key: string): Promise<Blob | null> {

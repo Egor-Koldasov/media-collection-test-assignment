@@ -15,7 +15,7 @@ describe('thumbnailCache', () => {
   it('stores and retrieves preview blobs by file name and size', async () => {
     const file = new File(['original'], 'asset.png', { type: 'image/png' });
     const key = createPreviewCacheKey(file);
-    const blob = new Blob(['thumbnail'], { type: 'image/webp' });
+    const blob = new Blob(['thumbnail'], { type: 'image/png' });
 
     await setThumbnailBlob(key, blob);
     const storedBlob = await getThumbnailBlob(key);

@@ -141,7 +141,13 @@ function* previewFlow(id: string): SagaIterator {
 
   try {
     const cacheKey = createPreviewCacheKey(runtime.file);
-    let previewBlob: Blob | null = yield call(getThumbnailBlob, cacheKey);
+    let previewBlob: Blob | null = null;
+
+    try {
+      previewBlob = yield call(getThumbnailBlob, cacheKey);
+    } catch {
+      previewBlob = null;
+    }
 
     if (!previewBlob) {
       const generatedPreview: Blob = yield call(
@@ -154,7 +160,11 @@ function* previewFlow(id: string): SagaIterator {
       );
       previewBlob = generatedPreview;
 
-      yield call(setThumbnailBlob, cacheKey, generatedPreview);
+      try {
+        yield call(setThumbnailBlob, cacheKey, generatedPreview);
+      } catch {
+        // Caching is best-effort. A storage miss should not block the preview itself.
+      }
     }
 
     if (previewController.signal.aborted) {
