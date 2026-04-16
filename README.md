@@ -1,67 +1,48 @@
-# Media Collection Manager
+# Media Collection Manager - the test assignment
 
 ## Run locally
 
 ```bash
-npm install && npm run dev
+npm install
+npm run dev
 ```
 
 ## Mock API approach
 
-The request client lives in `src/services/mediaApi.ts`. The mock backend lives in `src/mocks/handlers.ts` and is served through MSW.
-
-- `fetchMediaPage(page)`
-- `uploadFile(file, onProgress, signal)`
-
-I chose MSW because it gives the app a real HTTP boundary without requiring a real backend. For this task we do not have the exact backend contract, but in a real system we would. MSW is a better fit for that assumption than an in-memory service module because the client already talks to `/api/...` endpoints, so replacing the mock later means swapping the handlers for a real server instead of rewriting the application flow.
-
-The mock provides:
-
-- 60 seeded items
-- 12-item pages
-- 500-1000 ms latency
-- about 15% fetch failures
-- about 20% upload failures
+Mock API is implemented using MSW. MSW is a popular and reliable solution for creating mock API servers. For this task we do not have the exact backend contract, but in a real system we would. MSW is a better fit for that assumption than an in-memory service module because the client already talks to `/api/...` endpoints, so replacing the mock later means swapping the handlers for a real server instead of rewriting the application flow.
 
 ## Preview cache choice
 
-I chose IndexedDB for preview caching instead of the Cache API because the stored value is a generated image `Blob`, not an HTTP response. The cache key is `fileName + fileSize`, which maps directly to an IndexedDB entry and lets the app skip canvas generation when the same file is selected again.
+Preview cache is implemented using IndexedDB. IndexedDB works well when we treat images generated in browser as `Blob` data, while Cache API is designed for request-response pairs. In practice both choices solve this task well.
 
 ## Library choices
 
-- `react`: renders the single-page UI.
-- `react-dom`: mounts the React app in the browser.
-- `typescript`: provides strict typing and discriminated unions for async state.
-- `@reduxjs/toolkit`: handles slices, normalized entity state, and immutable reducer logic with less boilerplate.
-- `react-redux`: provides typed bindings between React components and the Redux store.
-- `redux-saga`: coordinates concurrent uploads, debounce, cancellation, and pagination guards.
-- `vite`: provides local development and production bundling with a small setup.
-- `@vitejs/plugin-react`: enables React support in the Vite toolchain.
-- `msw`: provides the mock backend at the HTTP layer so the app can be wired like a real client.
-- `tailwindcss`: provides styling without introducing a UI kit.
-- `postcss`: runs the CSS processing pipeline required by Tailwind.
-- `autoprefixer`: adds vendor prefixes during CSS build output.
-- `vitest`: runs unit tests in the same toolchain as the app build.
-- `jsdom`: provides the browser-like environment used by tests.
-- `@testing-library/jest-dom`: adds clearer DOM assertions for tests.
-- `fake-indexeddb`: provides IndexedDB support in tests so the preview cache can be verified.
-- `@types/node`, `@types/react`, `@types/react-dom`: provide TypeScript types for the runtime and tooling.
-
-Without these choices, the same app would require more manual state wiring, less reliable async coordination, weaker test coverage for browser APIs, or a slower local development loop.
+- `redux-saga`: Works well with redux and redux-toolkit. It's also used in the actual app, therefore it's nice to pick it in the test assignment.
+- `vite`: Modern, easy-to-use solution for a React SPA.
+- `tailwindcss`: Modern styling approach, that is popular and works good with LLMs.
+- `vitest`: Good modern solution to run tests.
+- `jsdom`: Provides the browser-like environment used by tests.
+- `@testing-library/jest-dom`: DOM helpers for tests.
+- `fake-indexeddb`: Mock IndexedDB for tests.
 
 ## Trade-offs and shortcuts
 
-- Uploaded items and removals are session-only; they are not persisted across refreshes.
-- The upload progress is client-driven while the request is in flight because the task requires progressive updates but there is no real backend transport contract to stream that information from.
-- Video thumbnails are generated from the first available frame in the browser, which is sufficient here but simpler than a production media pipeline.
+The project did not involve significant decisions. Major choices were dictated by the requirements. Library choices are explained in the section above. The shortcuts are listed in the section below.
 
 ## What I would improve with more time
 
-- Add an integration test for the full UI flow against the MSW request boundary.
-- Persist uploaded media metadata locally so the collection survives refreshes.
-- Add cache invalidation metadata and a cache size budget.
-- Add a real backend adapter once the production API contract is available.
+- [ ]  Fix infinite scroll jumps. After loading more items the page stays at the bottom of the list which creates a jumping effect.
+- [ ]  Inherit action creator types in sagas. Sagas don't throw errors if action payload types are incorrect. Inheriting types from action creators can help reacting to changes in payload types.
+- [ ]  Big amount of CSS literals in tailwind. In real project this can be fixed with a better UI library, design code and conventions.
+- [ ]  Use map objects instead of if else chains.
+- [ ]  For react conditional rendering use `&&` instead of `cond ? <Comp /> : null`.
+- [ ]  Add virtual scrolling. Consider optimizing the code for big lists.
+- [ ]  Setup prettier, eslint.
+- [ ]  Add responsive styles for smaller screens.
 
 ## Loom demo
 
 - Public Loom URL: `REPLACE_WITH_PUBLIC_LOOM_LINK`
+
+## Task requirements
+[test-assignment.pdf](./test-assignment.pdf)
