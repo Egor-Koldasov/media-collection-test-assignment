@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { getDocumentPreviewUrl } from '../documentPreview';
 import { createOptimisticMediaEntity } from '../mediaFactories';
 import { mediaActions, mediaReducer } from '../mediaSlice';
 import type { MediaEntity } from '../types';
@@ -58,6 +59,18 @@ describe('media slice', () => {
     expect(removedState.ids).not.toContain('upload-1');
   });
 
+  it('creates uploaded images without a mock poster preview', () => {
+    const optimisticItem = createOptimisticMediaEntity(
+      'upload-image',
+      new File(['hello'], 'hello.png', { type: 'image/png' }),
+      'image'
+    );
+
+    expect(optimisticItem.previewStatus).toEqual({ status: 'loading' });
+    expect(optimisticItem.previewUrl).toBeNull();
+    expect(optimisticItem.previewKind).toBe('poster');
+  });
+
   it('tracks upload failure details on the matching entity', () => {
     const optimisticItem = createOptimisticMediaEntity(
       'upload-2',
@@ -95,6 +108,7 @@ describe('media slice', () => {
 
     expect(optimisticItem.type).toBe('document');
     expect(optimisticItem.previewStatus).toEqual({ status: 'ready' });
+    expect(optimisticItem.previewUrl).toBe(getDocumentPreviewUrl());
     expect(optimisticItem.previewKind).toBe('poster');
   });
 });

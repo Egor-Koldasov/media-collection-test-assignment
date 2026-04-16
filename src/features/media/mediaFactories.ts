@@ -1,13 +1,23 @@
-import { getMockThumbnailForType } from '../../assets/mockThumbnails';
 import type { MediaEntity, MediaItem, MediaType } from './types';
+import { getDocumentPreviewUrl } from './documentPreview';
+
+function getDefaultPreviewUrl(type: MediaType): string | null {
+  if (type === 'document') {
+    return getDocumentPreviewUrl();
+  }
+
+  return null;
+}
 
 export function toSeededMediaEntity(item: MediaItem): MediaEntity {
+  const previewUrl = item.previewUrl ?? getDefaultPreviewUrl(item.type);
+
   return {
     ...item,
     source: 'seeded',
-    previewStatus: { status: 'ready' },
-    previewUrl: getMockThumbnailForType(item.type),
-    previewKind: 'poster',
+    previewStatus: previewUrl ? { status: 'ready' } : { status: 'idle' },
+    previewUrl,
+    previewKind: item.previewKind ?? 'poster',
     uploadState: { status: 'idle' },
     errorMessage: null
   };
@@ -20,6 +30,7 @@ export function createOptimisticMediaEntity(
 ): MediaEntity {
   const createdAt = new Date().toISOString();
   const hasGeneratedPreview = mediaType === 'image' || mediaType === 'video';
+  const previewUrl = getDefaultPreviewUrl(mediaType);
 
   return {
     id,
@@ -29,7 +40,7 @@ export function createOptimisticMediaEntity(
     createdAt,
     source: 'upload',
     previewStatus: hasGeneratedPreview ? { status: 'loading' } : { status: 'ready' },
-    previewUrl: getMockThumbnailForType(mediaType),
+    previewUrl,
     previewKind: 'poster',
     uploadState: { status: 'uploading', progress: 0 },
     errorMessage: null

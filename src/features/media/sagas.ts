@@ -340,7 +340,7 @@ function* handleRemoveMedia(action: PayloadAction<string>): SagaIterator {
 
   yield put(mediaActions.mediaRemoved({ id }));
 
-  if (item?.previewUrl.startsWith('blob:')) {
+  if (item?.previewUrl?.startsWith('blob:')) {
     URL.revokeObjectURL(item.previewUrl);
   }
 

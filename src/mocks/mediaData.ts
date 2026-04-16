@@ -4,6 +4,7 @@ import type {
   MediaType,
   PaginatedMediaResponse
 } from '../features/media/types';
+import { getMockPreviewUrlForType } from './mockThumbnails';
 
 const imageNames = [
   'Tabby sunbeam',
@@ -95,13 +96,16 @@ function createdAtForIndex(index: number): string {
 function createMediaItem(index: number): MediaItem {
   const type = (['image', 'video', 'document'] as const)[index % 3];
   const localIndex = Math.floor(index / 3);
+  const previewUrl = getMockPreviewUrlForType(type);
 
   return {
     id: `seed-${padNumber(index + 1)}`,
     name: `${nameForType(type, localIndex)} ${padNumber(index + 1)}.${extensionForType(type, localIndex)}`,
     type,
     size: sizeForType(type, localIndex),
-    createdAt: createdAtForIndex(index)
+    createdAt: createdAtForIndex(index),
+    previewUrl,
+    previewKind: previewUrl ? 'poster' : undefined
   };
 }
 

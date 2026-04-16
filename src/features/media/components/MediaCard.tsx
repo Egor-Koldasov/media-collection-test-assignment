@@ -12,6 +12,31 @@ interface MediaCardProps {
   item: MediaEntity;
 }
 
+function PreviewPlaceholder({ item }: { item: MediaEntity }) {
+  const message =
+    item.previewStatus.status === "loading"
+      ? "Generating preview"
+      : item.previewStatus.status === "error"
+        ? "Preview unavailable"
+        : "No preview available";
+
+  const toneClass =
+    item.previewStatus.status === "error"
+      ? "border-rust/15 bg-rust/6 text-rust"
+      : "border-ink/10 bg-[radial-gradient(circle_at_top,_rgba(124,163,85,0.16),_transparent_58%),linear-gradient(180deg,_rgba(255,255,255,0.94),_rgba(237,244,247,0.98))] text-ink/58";
+
+  return (
+    <div
+      className={`flex h-full w-full flex-col items-center justify-center gap-2 rounded-[22px] border px-6 text-center ${toneClass}`}
+    >
+      <span className="text-[11px] font-medium uppercase tracking-[0.16em]">
+        {formatMediaType(item.type)}
+      </span>
+      <span className="text-sm leading-snug">{message}</span>
+    </div>
+  );
+}
+
 function StatusBadge({ item }: { item: MediaEntity }) {
   if (item.uploadState.status === "uploading") {
     return (
@@ -57,12 +82,16 @@ export function MediaCard({ item }: MediaCardProps) {
       </button>
 
       <div className="relative mx-auto h-[200px] w-[200px] overflow-hidden rounded-[22px] bg-[#edf4f7]">
-        <img
-          src={item.previewUrl}
-          alt={`${item.name} preview`}
-          className="h-full w-full object-cover"
-          loading="lazy"
-        />
+        {item.previewUrl ? (
+          <img
+            src={item.previewUrl}
+            alt={`${item.name} preview`}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <PreviewPlaceholder item={item} />
+        )}
 
         {item.previewStatus.status === "loading" ? (
           <div className="absolute inset-0 flex items-center justify-center bg-ink/16 backdrop-blur-[1px]">

@@ -10,6 +10,8 @@ export interface MediaItem {
   type: MediaType;
   size: number;
   createdAt: string;
+  previewUrl?: string | null;
+  previewKind?: PreviewKind;
 }
 
 export interface PaginatedMediaResponse {
@@ -39,7 +41,7 @@ export type UploadState =
 export interface MediaEntity extends MediaItem {
   source: MediaSource;
   previewStatus: PreviewState;
-  previewUrl: string;
+  previewUrl: string | null;
   previewKind: PreviewKind;
   uploadState: UploadState;
   errorMessage: string | null;
