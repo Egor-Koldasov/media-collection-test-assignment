@@ -42,7 +42,7 @@ The project did not involve significant decisions. Major choices were dictated b
 
 ## Loom demo
 
-- Public Loom URL: `REPLACE_WITH_PUBLIC_LOOM_LINK`
+[https://www.loom.com/share/ba16175aa7e249b89fb5ef197938175a](https://www.loom.com/share/ba16175aa7e249b89fb5ef197938175a)
 
 ## Task requirements
 [test-assignment.pdf](./test-assignment.pdf)
