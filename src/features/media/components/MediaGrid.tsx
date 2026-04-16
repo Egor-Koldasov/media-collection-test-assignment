@@ -179,7 +179,7 @@ export function MediaGrid({
     <div className="space-y-6 pt-5">
       <div
         ref={collectionRef}
-        className="relative min-h-[280px]"
+        className="relative"
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
