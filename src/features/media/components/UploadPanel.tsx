@@ -12,7 +12,22 @@ export function UploadPanel({
   onUploadClick,
 }: UploadPanelProps) {
   return (
-    <div className="flex flex-col items-start gap-3">
+    <div className="flex flex-col md:flex-row-reverse md:items-end items-start gap-3">
+      {validationIssues.length > 0 ? (
+        <ul className="space-y-2 rounded-[22px] border border-rust/18 bg-rust/7 p-4">
+          {validationIssues.map((issue) => (
+            <li
+              key={issue.id}
+              className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start"
+            >
+              <span className="font-medium text-ink">{issue.name}</span>
+              <span className="hidden text-rust/55 sm:inline">•</span>
+              <span className="text-rust">{issue.message}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -29,21 +44,6 @@ export function UploadPanel({
           </span>
         ) : null}
       </div>
-
-      {validationIssues.length > 0 ? (
-        <ul className="space-y-2 rounded-[22px] border border-rust/18 bg-rust/7 p-4">
-          {validationIssues.map((issue) => (
-            <li
-              key={issue.id}
-              className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start"
-            >
-              <span className="font-medium text-ink">{issue.name}</span>
-              <span className="hidden text-rust/55 sm:inline">•</span>
-              <span className="text-rust">{issue.message}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }
