@@ -83,4 +83,18 @@ describe('media slice', () => {
     });
     expect(failedState.entities['upload-2']?.errorMessage).toBe('Upload cancelled.');
   });
+
+  it('creates uploaded documents with a ready poster preview', () => {
+    const optimisticItem = createOptimisticMediaEntity(
+      'upload-3',
+      new File(['document'], 'brief.docx', {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }),
+      'document'
+    );
+
+    expect(optimisticItem.type).toBe('document');
+    expect(optimisticItem.previewStatus).toEqual({ status: 'ready' });
+    expect(optimisticItem.previewKind).toBe('poster');
+  });
 });

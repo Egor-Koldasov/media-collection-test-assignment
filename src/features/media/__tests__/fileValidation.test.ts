@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { validateSelectedFiles } from '../fileValidation';
 
 describe('validateSelectedFiles', () => {
-  it('accepts supported files and reports type, size, and batch-limit issues', () => {
+  it('maps unsupported formats to documents and still enforces size and batch limits', () => {
     const files = [
       new File(['image'], 'frame-1.png', { type: 'image/png' }),
       new File(['text'], 'notes.txt', { type: 'text/plain' }),
@@ -17,10 +17,15 @@ describe('validateSelectedFiles', () => {
 
     const result = validateSelectedFiles(files);
 
-    expect(result.validFiles).toHaveLength(3);
-    expect(result.issues).toHaveLength(3);
+    expect(result.validFiles).toHaveLength(4);
+    expect(result.validFiles.map((item) => item.mediaType)).toEqual([
+      'image',
+      'document',
+      'image',
+      'video'
+    ]);
+    expect(result.issues).toHaveLength(2);
     expect(result.issues.map((issue) => issue.message)).toEqual([
-      'Unsupported format. Choose JPEG, PNG, WEBP, MP4.',
       'File exceeds the 10 MB size limit.',
       'Only 5 files can be uploaded at once.'
     ]);

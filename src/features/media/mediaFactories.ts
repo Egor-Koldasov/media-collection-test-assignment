@@ -1,5 +1,5 @@
 import { getMockThumbnailForType } from '../../assets/mockThumbnails';
-import type { MediaEntity, MediaItem } from './types';
+import type { MediaEntity, MediaItem, MediaType } from './types';
 
 export function toSeededMediaEntity(item: MediaItem): MediaEntity {
   return {
@@ -16,9 +16,10 @@ export function toSeededMediaEntity(item: MediaItem): MediaEntity {
 export function createOptimisticMediaEntity(
   id: string,
   file: File,
-  mediaType: 'image' | 'video'
+  mediaType: MediaType
 ): MediaEntity {
   const createdAt = new Date().toISOString();
+  const hasGeneratedPreview = mediaType === 'image' || mediaType === 'video';
 
   return {
     id,
@@ -27,7 +28,7 @@ export function createOptimisticMediaEntity(
     size: file.size,
     createdAt,
     source: 'upload',
-    previewStatus: { status: 'loading' },
+    previewStatus: hasGeneratedPreview ? { status: 'loading' } : { status: 'ready' },
     previewUrl: getMockThumbnailForType(mediaType),
     previewKind: 'poster',
     uploadState: { status: 'uploading', progress: 0 },

@@ -1,4 +1,3 @@
-import { ACCEPTED_UPLOAD_LABEL, MAX_FILES_PER_BATCH } from "../constants";
 import type { UploadValidationIssue } from "../types";
 
 interface UploadPanelProps {

@@ -8,8 +8,7 @@ import {
 
 import { useAppDispatch } from '../../../app/hooks';
 import {
-  ACCEPTED_UPLOAD_LABEL,
-  MAX_FILES_PER_BATCH
+  MAX_FILES_PER_BATCH,
 } from '../constants';
 import { requestNextPage } from '../mediaSlice';
 import type { MediaEntity } from '../types';
@@ -57,6 +56,12 @@ interface OverlayRect {
   height: number;
 }
 
+function isFileDrag(dataTransfer: DataTransfer | null): boolean {
+  return dataTransfer
+    ? Array.from(dataTransfer.types).includes("Files")
+    : false;
+}
+
 export function MediaGrid({
   items,
   isInitialLoading,
@@ -75,12 +80,14 @@ export function MediaGrid({
   const dispatch = useAppDispatch();
   const collectionRef = useRef<HTMLDivElement | null>(null);
   const [overlayRect, setOverlayRect] = useState<OverlayRect | null>(null);
+  const [isDropZoneHovered, setIsDropZoneHovered] = useState(false);
   const gridClassName =
     "grid justify-start gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),232px))]";
 
   useEffect(() => {
     if (!isCollectionDragActive) {
       setOverlayRect(null);
+      setIsDropZoneHovered(false);
       return;
     }
 
@@ -119,6 +126,46 @@ export function MediaGrid({
     };
   }, [isCollectionDragActive]);
 
+  const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    onCollectionDragEnter(event);
+
+    if (isFileDrag(event.dataTransfer)) {
+      setIsDropZoneHovered(true);
+    }
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    onCollectionDragOver(event);
+
+    if (isFileDrag(event.dataTransfer) && !isDropZoneHovered) {
+      setIsDropZoneHovered(true);
+    }
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    onCollectionDragLeave(event);
+
+    if (!isFileDrag(event.dataTransfer)) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const isStillInside =
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom;
+
+    if (!isStillInside) {
+      setIsDropZoneHovered(false);
+    }
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    setIsDropZoneHovered(false);
+    onCollectionDrop(event);
+  };
+
   const collectionContent = isInitialLoading ? (
     <div className={gridClassName}>
       {Array.from({ length: 8 }, (_, index) => (
@@ -142,10 +189,10 @@ export function MediaGrid({
       <div
         ref={collectionRef}
         className="relative min-h-[280px]"
-        onDragEnter={onCollectionDragEnter}
-        onDragOver={onCollectionDragOver}
-        onDragLeave={onCollectionDragLeave}
-        onDrop={onCollectionDrop}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         <div
           className={[
@@ -160,7 +207,12 @@ export function MediaGrid({
 
         {isCollectionDragActive && overlayRect ? (
           <div
-            className="pointer-events-none fixed z-20 flex items-center justify-center border border-dashed border-olive/30 bg-[linear-gradient(180deg,rgba(243,250,252,0.9),rgba(232,244,247,0.96))] backdrop-blur-sm"
+            className={[
+              "pointer-events-none fixed z-20 flex items-center justify-center border transition duration-200 backdrop-blur-sm",
+              isDropZoneHovered
+                ? "border-dashed border-olive/30 bg-[linear-gradient(180deg,rgba(243,250,252,0.9),rgba(232,244,247,0.96))]"
+                : "border-dashed border-ink/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(252,253,254,0.98))]",
+            ].join(" ")}
             style={
               {
                 top: overlayRect.top,
@@ -171,7 +223,11 @@ export function MediaGrid({
               } satisfies CSSProperties
             }
           >
-            <div className="flex max-w-md flex-col items-center gap-4 rounded-[28px] border border-white/85 bg-white/86 px-8 py-7 text-center shadow-card">
+            <div
+              className={[
+                "flex max-w-md flex-col items-center gap-4 rounded-[28px] border px-8 py-7 text-center shadow-card border-white/85 bg-white/86",
+              ].join(" ")}
+            >
               <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-olive/10 text-olive shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                 <svg
                   aria-hidden="true"
@@ -195,7 +251,8 @@ export function MediaGrid({
                 </p>
               </div>
               <p className="text-xs text-ink/46">
-                {ACCEPTED_UPLOAD_LABEL}. Up to {MAX_FILES_PER_BATCH} files, 10 MB each.
+                Supported media types: JPEG, PNG, WEBP, MP4.
+                Up to {MAX_FILES_PER_BATCH} files, 10 MB each.
               </p>
             </div>
           </div>

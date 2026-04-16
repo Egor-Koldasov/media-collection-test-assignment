@@ -285,8 +285,12 @@ function* handleFilesSelected(action: PayloadAction<File[]>): SagaIterator {
     registerRuntimeEntry(id, validFile.file);
     yield put(mediaActions.uploadQueued({ item }));
 
-    const previewTask: Task = yield fork(previewFlow, id);
     const uploadTask: Task = yield fork(uploadFlow, id);
+    let previewTask: Task | undefined;
+
+    if (validFile.mediaType !== 'document') {
+      previewTask = yield fork(previewFlow, id);
+    }
 
     patchRuntimeEntry(id, {
       previewTask,

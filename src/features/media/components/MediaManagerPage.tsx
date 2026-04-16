@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
 
 import { useAppDispatch, useAppSelector } from "../../../app/hooks";
-import { ACCEPTED_UPLOAD_TYPES } from "../constants";
 import { filesSelected, requestNextPage } from "../mediaSlice";
 import {
   selectActiveUploadsCount,
@@ -19,8 +18,10 @@ function toFileArray(fileList: FileList | null): File[] {
   return fileList ? Array.from(fileList) : [];
 }
 
-function isFileDrag(event: DragEvent<HTMLElement>): boolean {
-  return Array.from(event.dataTransfer.types).includes("Files");
+function isFileDrag(dataTransfer: DataTransfer | null): boolean {
+  return dataTransfer
+    ? Array.from(dataTransfer.types).includes("Files")
+    : false;
 }
 
 export function MediaManagerPage() {
@@ -32,7 +33,7 @@ export function MediaManagerPage() {
   const validationIssues = useAppSelector(selectValidationIssues);
   const activeUploadsCount = useAppSelector(selectActiveUploadsCount);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const dragDepthRef = useRef(0);
+  const pageDragDepthRef = useRef(0);
   const [isCollectionDragActive, setIsCollectionDragActive] = useState(false);
 
   useEffect(() => {
@@ -41,16 +42,70 @@ export function MediaManagerPage() {
 
   useEffect(() => {
     const resetCollectionDrag = () => {
-      dragDepthRef.current = 0;
+      pageDragDepthRef.current = 0;
       setIsCollectionDragActive(false);
     };
 
+    const handleWindowDragEnter = (event: globalThis.DragEvent) => {
+      const { dataTransfer } = event;
+
+      if (!dataTransfer || !isFileDrag(dataTransfer)) {
+        return;
+      }
+
+      pageDragDepthRef.current += 1;
+      setIsCollectionDragActive(true);
+    };
+
+    const handleWindowDragOver = (event: globalThis.DragEvent) => {
+      const { dataTransfer } = event;
+
+      if (!dataTransfer || !isFileDrag(dataTransfer)) {
+        return;
+      }
+
+      event.preventDefault();
+      dataTransfer.dropEffect = "copy";
+      setIsCollectionDragActive(true);
+    };
+
+    const handleWindowDragLeave = (event: globalThis.DragEvent) => {
+      const { dataTransfer } = event;
+
+      if (!dataTransfer || !isFileDrag(dataTransfer)) {
+        return;
+      }
+
+      pageDragDepthRef.current = Math.max(0, pageDragDepthRef.current - 1);
+
+      if (pageDragDepthRef.current === 0) {
+        setIsCollectionDragActive(false);
+      }
+    };
+
+    const handleWindowDrop = (event: globalThis.DragEvent) => {
+      const { dataTransfer } = event;
+
+      if (!dataTransfer || !isFileDrag(dataTransfer)) {
+        return;
+      }
+
+      event.preventDefault();
+      resetCollectionDrag();
+    };
+
+    window.addEventListener("dragenter", handleWindowDragEnter);
+    window.addEventListener("dragover", handleWindowDragOver);
+    window.addEventListener("dragleave", handleWindowDragLeave);
     window.addEventListener("dragend", resetCollectionDrag);
-    window.addEventListener("drop", resetCollectionDrag);
+    window.addEventListener("drop", handleWindowDrop);
 
     return () => {
+      window.removeEventListener("dragenter", handleWindowDragEnter);
+      window.removeEventListener("dragover", handleWindowDragOver);
+      window.removeEventListener("dragleave", handleWindowDragLeave);
       window.removeEventListener("dragend", resetCollectionDrag);
-      window.removeEventListener("drop", resetCollectionDrag);
+      window.removeEventListener("drop", handleWindowDrop);
     };
   }, []);
 
@@ -71,17 +126,16 @@ export function MediaManagerPage() {
   };
 
   const handleCollectionDragEnter = (event: DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
+    if (!isFileDrag(event.dataTransfer)) {
       return;
     }
 
     event.preventDefault();
-    dragDepthRef.current += 1;
     setIsCollectionDragActive(true);
   };
 
   const handleCollectionDragOver = (event: DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
+    if (!isFileDrag(event.dataTransfer)) {
       return;
     }
 
@@ -94,24 +148,18 @@ export function MediaManagerPage() {
   };
 
   const handleCollectionDragLeave = (event: DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
+    if (!isFileDrag(event.dataTransfer)) {
       return;
-    }
-
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-
-    if (dragDepthRef.current === 0) {
-      setIsCollectionDragActive(false);
     }
   };
 
   const handleCollectionDrop = (event: DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
+    if (!isFileDrag(event.dataTransfer)) {
       return;
     }
 
     event.preventDefault();
-    dragDepthRef.current = 0;
+    pageDragDepthRef.current = 0;
     setIsCollectionDragActive(false);
     submitFiles(event.dataTransfer.files);
   };
@@ -129,7 +177,6 @@ export function MediaManagerPage() {
           ref={inputRef}
           type="file"
           multiple
-          accept={ACCEPTED_UPLOAD_TYPES.join(",")}
           className="hidden"
           onChange={(event) => submitFiles(event.target.files)}
         />

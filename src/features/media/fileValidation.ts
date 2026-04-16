@@ -1,30 +1,29 @@
 import {
-  ACCEPTED_UPLOAD_LABEL,
-  ACCEPTED_UPLOAD_TYPES,
   MAX_FILE_BYTES,
-  MAX_FILES_PER_BATCH
+  MAX_FILES_PER_BATCH,
+  SUPPORTED_IMAGE_AND_VIDEO_TYPES
 } from './constants';
 import type { MediaType, UploadValidationIssue } from './types';
 
 export interface ValidatedMediaFile {
   file: File;
-  mediaType: Extract<MediaType, 'image' | 'video'>;
+  mediaType: MediaType;
 }
 
-const acceptedTypeSet = new Set<string>(ACCEPTED_UPLOAD_TYPES);
+const supportedTypeSet = new Set<string>(SUPPORTED_IMAGE_AND_VIDEO_TYPES);
 
-export function getUploadMediaType(
-  mimeType: string
-): Extract<MediaType, 'image' | 'video'> | null {
-  if (mimeType.startsWith('image/')) {
-    return 'image';
+export function getUploadMediaType(mimeType: string): MediaType {
+  if (supportedTypeSet.has(mimeType as (typeof SUPPORTED_IMAGE_AND_VIDEO_TYPES)[number])) {
+    if (mimeType.startsWith('image/')) {
+      return 'image';
+    }
+
+    if (mimeType === 'video/mp4') {
+      return 'video';
+    }
   }
 
-  if (mimeType === 'video/mp4') {
-    return 'video';
-  }
-
-  return null;
+  return 'document';
 }
 
 export function validateSelectedFiles(files: File[]): {
@@ -46,15 +45,6 @@ export function validateSelectedFiles(files: File[]): {
       return;
     }
 
-    if (!acceptedTypeSet.has(file.type as (typeof ACCEPTED_UPLOAD_TYPES)[number])) {
-      issues.push({
-        id: issueId,
-        name: file.name,
-        message: `Unsupported format. Choose ${ACCEPTED_UPLOAD_LABEL}.`
-      });
-      return;
-    }
-
     if (file.size > MAX_FILE_BYTES) {
       issues.push({
         id: issueId,
@@ -65,16 +55,6 @@ export function validateSelectedFiles(files: File[]): {
     }
 
     const mediaType = getUploadMediaType(file.type);
-
-    if (!mediaType) {
-      issues.push({
-        id: issueId,
-        name: file.name,
-        message: 'This file type is not supported.'
-      });
-      return;
-    }
-
     validFiles.push({ file, mediaType });
   });
 
