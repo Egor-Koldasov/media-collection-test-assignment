@@ -21,7 +21,7 @@ import {
   takeLeading
 } from 'redux-saga/effects';
 
-import { fetchMediaPage, uploadFile } from '../../services/mockMediaApi';
+import { fetchMediaPage, uploadFile } from '../../services/mediaApi';
 import {
   createPreviewCacheKey,
   getThumbnailBlob,

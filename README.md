@@ -8,12 +8,12 @@ npm install && npm run dev
 
 ## Mock API approach
 
-The mock API lives in `src/services/mockMediaApi.ts` and exposes the required contract:
+The request client lives in `src/services/mediaApi.ts`. The mock backend lives in `src/mocks/handlers.ts` and is served through MSW.
 
 - `fetchMediaPage(page)`
 - `uploadFile(file, onProgress, signal)`
 
-I implemented it as an in-memory service module instead of MSW or `json-server` because this task has no real backend contract, no routing surface, and no persistence requirement. This keeps the async behavior explicit, easy to test, and easy to replace later by swapping the service implementation without changing the Redux or saga layers.
+I chose MSW because it gives the app a real HTTP boundary without requiring a real backend. For this task we do not have the exact backend contract, but in a real system we would. MSW is a better fit for that assumption than an in-memory service module because the client already talks to `/api/...` endpoints, so replacing the mock later means swapping the handlers for a real server instead of rewriting the application flow.
 
 The mock provides:
 
@@ -37,6 +37,7 @@ I chose IndexedDB for preview caching instead of the Cache API because the store
 - `redux-saga`: coordinates concurrent uploads, debounce, cancellation, and pagination guards.
 - `vite`: provides local development and production bundling with a small setup.
 - `@vitejs/plugin-react`: enables React support in the Vite toolchain.
+- `msw`: provides the mock backend at the HTTP layer so the app can be wired like a real client.
 - `tailwindcss`: provides styling without introducing a UI kit.
 - `postcss`: runs the CSS processing pipeline required by Tailwind.
 - `autoprefixer`: adds vendor prefixes during CSS build output.
@@ -51,15 +52,15 @@ Without these choices, the same app would require more manual state wiring, less
 ## Trade-offs and shortcuts
 
 - Uploaded items and removals are session-only; they are not persisted across refreshes.
-- The mock API is a service module rather than an HTTP mock layer; that keeps the project smaller, but it does not exercise request tooling.
+- The upload progress is client-driven while the request is in flight because the task requires progressive updates but there is no real backend transport contract to stream that information from.
 - Video thumbnails are generated from the first available frame in the browser, which is sufficient here but simpler than a production media pipeline.
 
 ## What I would improve with more time
 
-- Add integration tests for the main upload and infinite-scroll flows.
+- Add an integration test for the full UI flow against the MSW request boundary.
 - Persist uploaded media metadata locally so the collection survives refreshes.
 - Add cache invalidation metadata and a cache size budget.
-- Add an MSW-backed mode to test the same UI through a request boundary.
+- Add a real backend adapter once the production API contract is available.
 
 ## Loom demo
 
