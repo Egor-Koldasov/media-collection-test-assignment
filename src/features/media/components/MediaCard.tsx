@@ -104,7 +104,7 @@ export function MediaCard({ item }: MediaCardProps) {
         <div className="space-y-2">
           <div className="flex items-start justify-between gap-3">
             <p className="min-w-0 text-[15px] font-semibold leading-snug text-ink">
-              <span className="line-clamp-2">{item.name}</span>
+              <span className="line-clamp-2 break-words">{item.name}</span>
             </p>
             <StatusBadge item={item} />
           </div>
