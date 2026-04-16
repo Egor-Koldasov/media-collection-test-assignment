@@ -14,6 +14,10 @@ import { requestNextPage } from '../mediaSlice';
 import type { MediaEntity } from '../types';
 import { InfiniteSentinel } from './InfiniteSentinel';
 import { MediaCard } from './MediaCard';
+import {
+  isFileDrag,
+  type CollectionDropTargetHandlers,
+} from './useCollectionFileDrop';
 
 interface MediaGridProps {
   items: MediaEntity[];
@@ -25,10 +29,7 @@ interface MediaGridProps {
   hasMore: boolean;
   showEndOfList: boolean;
   isCollectionDragActive: boolean;
-  onCollectionDragEnter: (event: DragEvent<HTMLDivElement>) => void;
-  onCollectionDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onCollectionDragLeave: (event: DragEvent<HTMLDivElement>) => void;
-  onCollectionDrop: (event: DragEvent<HTMLDivElement>) => void;
+  dropTargetHandlers: CollectionDropTargetHandlers;
 }
 
 function SkeletonCard() {
@@ -56,12 +57,6 @@ interface OverlayRect {
   height: number;
 }
 
-function isFileDrag(dataTransfer: DataTransfer | null): boolean {
-  return dataTransfer
-    ? Array.from(dataTransfer.types).includes("Files")
-    : false;
-}
-
 export function MediaGrid({
   items,
   isInitialLoading,
@@ -72,10 +67,7 @@ export function MediaGrid({
   hasMore,
   showEndOfList,
   isCollectionDragActive,
-  onCollectionDragEnter,
-  onCollectionDragOver,
-  onCollectionDragLeave,
-  onCollectionDrop
+  dropTargetHandlers
 }: MediaGridProps) {
   const dispatch = useAppDispatch();
   const collectionRef = useRef<HTMLDivElement | null>(null);
@@ -127,7 +119,7 @@ export function MediaGrid({
   }, [isCollectionDragActive]);
 
   const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
-    onCollectionDragEnter(event);
+    dropTargetHandlers.onDragEnter(event);
 
     if (isFileDrag(event.dataTransfer)) {
       setIsDropZoneHovered(true);
@@ -135,7 +127,7 @@ export function MediaGrid({
   };
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
-    onCollectionDragOver(event);
+    dropTargetHandlers.onDragOver(event);
 
     if (isFileDrag(event.dataTransfer) && !isDropZoneHovered) {
       setIsDropZoneHovered(true);
@@ -143,8 +135,6 @@ export function MediaGrid({
   };
 
   const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
-    onCollectionDragLeave(event);
-
     if (!isFileDrag(event.dataTransfer)) {
       return;
     }
@@ -163,9 +153,10 @@ export function MediaGrid({
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     setIsDropZoneHovered(false);
-    onCollectionDrop(event);
+    dropTargetHandlers.onDrop(event);
   };
 
+  // TODO: move to a separate React component
   const collectionContent = isInitialLoading ? (
     <div className={gridClassName}>
       {Array.from({ length: 8 }, (_, index) => (
