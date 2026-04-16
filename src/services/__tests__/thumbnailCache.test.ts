@@ -17,6 +17,7 @@ describe('thumbnailCache', () => {
     const key = createPreviewCacheKey(file);
     const blob = new Blob(['thumbnail'], { type: 'image/png' });
 
+    expect(key).toBe('asset.png:8');
     await setThumbnailBlob(key, blob);
     const storedBlob = await getThumbnailBlob(key);
 
