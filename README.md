@@ -1,93 +1,66 @@
 # Media Collection Manager
 
-Minimal single-page media manager built with React, TypeScript, Redux Toolkit, Redux Saga, and Tailwind CSS.
-
 ## Run locally
-
-Fresh clone:
 
 ```bash
 npm install && npm run dev
 ```
 
-Other useful commands:
-
-```bash
-npm run test:run
-npm run build
-```
-
-## What’s in the app
-
-- Infinite-scroll media gallery with paginated loading via `IntersectionObserver`
-- Client-side filter, sort, and debounced search powered by memoized selectors
-- Concurrent uploads with optimistic cards, progress, cancellation, and retry
-- Client-side thumbnail generation for images and videos with `Canvas`
-- IndexedDB-backed preview cache keyed by `fileName + fileSize`
-
 ## Mock API approach
 
-The mock layer lives in [`src/services/mockMediaApi.ts`](/Users/egorkolds/.codex/worktrees/4e89/one-shot/src/services/mockMediaApi.ts) and exposes the exact contract from the task:
+The mock API lives in `src/services/mockMediaApi.ts` and exposes the required contract:
 
 - `fetchMediaPage(page)`
 - `uploadFile(file, onProgress, signal)`
 
-I chose an in-memory mock module instead of MSW or `json-server` because there is no real backend contract, no route surface, and no persistence requirement for this take-home. A direct service module keeps the async behavior explicit, easy to test, and easy to swap later. Replacing it with a real API would mean keeping the saga layer and changing only the service implementation.
+I implemented it as an in-memory service module instead of MSW or `json-server` because this task has no real backend contract, no routing surface, and no persistence requirement. This keeps the async behavior explicit, easy to test, and easy to replace later by swapping the service implementation without changing the Redux or saga layers.
 
-The mock intentionally includes:
+The mock provides:
 
-- 60 deterministic seeded items
+- 60 seeded items
 - 12-item pages
 - 500-1000 ms latency
-- About 15% fetch failures
-- About 20% upload failures
+- about 15% fetch failures
+- about 20% upload failures
 
 ## Preview cache choice
 
-I chose IndexedDB instead of the Cache API for preview storage.
-
-- The stored value is a generated preview `Blob`, not an HTTP response.
-- The required cache key is `fileName + fileSize`, which maps cleanly to an IndexedDB object store.
-- IndexedDB keeps the cache logic explicit and easier to evolve into richer metadata later.
-
-Without IndexedDB, previews would be regenerated every time the same file was selected again, which adds unnecessary client work and makes retry flows feel worse.
+I chose IndexedDB for preview caching instead of the Cache API because the stored value is a generated image `Blob`, not an HTTP response. The cache key is `fileName + fileSize`, which maps directly to an IndexedDB entry and lets the app skip canvas generation when the same file is selected again.
 
 ## Library choices
 
-- `react`: rendering the application UI.
-- `typescript`: strict typing and discriminated unions for async state.
-- `vite`: fast local development and production bundling.
-- `@reduxjs/toolkit`: slices, normalized entity state, memoized selectors, and predictable reducer code.
-- `react-redux`: typed bindings between React and the Redux store.
-- `redux-saga`: orchestration for concurrent uploads, debounce, cancellation, and guarded pagination.
-- `tailwindcss`: consistent, production-friendly styling without a UI kit.
-- `vitest`: fast unit tests in the same Vite toolchain.
-- `fake-indexeddb`: IndexedDB test environment for cache coverage.
+- `react`: renders the single-page UI.
+- `react-dom`: mounts the React app in the browser.
+- `typescript`: provides strict typing and discriminated unions for async state.
+- `@reduxjs/toolkit`: handles slices, normalized entity state, and immutable reducer logic with less boilerplate.
+- `react-redux`: provides typed bindings between React components and the Redux store.
+- `redux-saga`: coordinates concurrent uploads, debounce, cancellation, and pagination guards.
+- `vite`: provides local development and production bundling with a small setup.
+- `@vitejs/plugin-react`: enables React support in the Vite toolchain.
+- `tailwindcss`: provides styling without introducing a UI kit.
+- `postcss`: runs the CSS processing pipeline required by Tailwind.
+- `autoprefixer`: adds vendor prefixes during CSS build output.
+- `vitest`: runs unit tests in the same toolchain as the app build.
+- `jsdom`: provides the browser-like environment used by tests.
+- `@testing-library/jest-dom`: adds clearer DOM assertions for tests.
+- `fake-indexeddb`: provides IndexedDB support in tests so the preview cache can be verified.
+- `@types/node`, `@types/react`, `@types/react-dom`: provide TypeScript types for the runtime and tooling.
 
-Without Redux Toolkit and Saga, the app would need more manual state wiring and more fragile async coordination. Without Tailwind, the UI would still work, but maintaining the visual system would be slower. Without Vitest and fake-indexeddb, the async service and cache behavior would be harder to verify confidently.
-
-## Architecture notes
-
-- Redux state only contains serializable UI and domain data.
-- `File`, `AbortController`, running saga tasks, and temporary object URLs stay in a module-scoped runtime registry.
-- All filtering, sorting, search, pagination guards, and empty-state decisions go through selectors.
-- Seeded image and video items use a local pool of 10 cat photos, chosen randomly when mock items are created, and documents use a static illustration because the provided contract has no media URLs.
+Without these choices, the same app would require more manual state wiring, less reliable async coordination, weaker test coverage for browser APIs, or a slower local development loop.
 
 ## Trade-offs and shortcuts
 
-- User-created uploads and removals are session-only. The preview cache persists, but the gallery contents reset on refresh.
-- The mock API is service-based rather than HTTP-based. That keeps the implementation smaller, but it does not mimic network tooling like MSW would.
-- The generated video thumbnail uses the first available frame from a hidden video element, which is appropriate for the task but not as robust as a dedicated media processing pipeline.
+- Uploaded items and removals are session-only; they are not persisted across refreshes.
+- The mock API is a service module rather than an HTTP mock layer; that keeps the project smaller, but it does not exercise request tooling.
+- Video thumbnails are generated from the first available frame in the browser, which is sufficient here but simpler than a production media pipeline.
 
 ## What I would improve with more time
 
-- Add a small integration test layer for the main upload and infinite-scroll flows.
-- Persist user-created media entries locally for an optional “resume session” experience.
-- Add richer cache invalidation metadata and a lightweight cache size budget.
-- Introduce an MSW-backed mode to exercise the same app against a request boundary.
+- Add integration tests for the main upload and infinite-scroll flows.
+- Persist uploaded media metadata locally so the collection survives refreshes.
+- Add cache invalidation metadata and a cache size budget.
+- Add an MSW-backed mode to test the same UI through a request boundary.
 
 ## Loom demo
 
-Replace this placeholder with the final public Loom link before submission:
-
-- `TODO: add Loom demo URL`
+- Public Loom URL: `REPLACE_WITH_PUBLIC_LOOM_LINK`
