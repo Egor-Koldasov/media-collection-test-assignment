@@ -107,6 +107,7 @@ export const selectGalleryViewModel = createSelector(
       controls.typeFilter !== 'all' || controls.searchQuery.length > 0;
     const showEmpty =
       !isInitialLoading && visibleItems.length === 0 && fetchError === null;
+    // TODO: It might be better to move this into the React component.
     const emptyMessage =
       allItems.length === 0
         ? 'Add your first file to start the collection.'
