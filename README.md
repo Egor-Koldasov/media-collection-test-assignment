@@ -31,7 +31,6 @@ The project did not involve significant decisions. Major choices were dictated b
 
 ## What I would improve with more time
 
-- [ ]  Fix infinite scroll jumps. After loading more items the page stays at the bottom of the list which creates a jumping effect.
 - [ ]  Inherit action creator types in sagas. Sagas don't throw errors if action payload types are incorrect. Inheriting types from action creators can help reacting to changes in payload types.
 - [ ]  Big amount of CSS literals in tailwind. In real project this can be fixed with a better UI library, design code and conventions.
 - [ ]  Use map objects instead of if else chains.
