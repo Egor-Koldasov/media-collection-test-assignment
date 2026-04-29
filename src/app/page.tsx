@@ -1,14 +1,11 @@
 import Link from "next/link";
-import { demos } from "@/demo";
 
 export default function Home() {
   return (
     <main className="demo-links">
-      {demos.map((demo) => (
-        <Link href={`/demos/${demo.slug}`} key={demo.slug}>
-          {demo.title}
-        </Link>
-      ))}
+      <Link href="/demos/raw-webgl-triangle">Raw WebGL2 Triangle</Link>
+      <Link href="/demos/three-spinning-cube">Three.js Spinning Cube</Link>
+      <Link href="/demos/demo1">Demo 1</Link>
     </main>
   );
 }

@@ -19,7 +19,8 @@ Open `http://localhost:3000` to browse the demo library.
 
 - `src/app` contains the Next.js App Router pages and global styles.
 - `src/demo/{demoName}` contains demo-specific metadata and client components.
-- The home page lists all registered demos from `src/demo/index.ts`.
+- The home page is a static list of links to demo routes.
+- Each demo route re-exports a component from `src/demo/{demoName}`.
 
 ## Included Demos
 
