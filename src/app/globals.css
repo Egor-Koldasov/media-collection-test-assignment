@@ -1,0 +1,41 @@
+:root {
+  color-scheme: dark;
+  --bg: #11110f;
+  --text: #f2f0e8;
+  --accent: #9fddc7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    ui-monospace, "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono",
+    Menlo, monospace;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.demo-links {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+}
+
+.demo-canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}

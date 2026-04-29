@@ -1,0 +1,33 @@
+{
+  "name": "one-shot",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.2.4",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "three": "0.184.0"
+  },
+  "devDependencies": {
+    "@types/node": "25.6.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@types/three": "0.184.0",
+    "eslint": "10.2.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.59.1"
+  },
+  "overrides": {
+    "postcss": "8.5.12"
+  }
+}
