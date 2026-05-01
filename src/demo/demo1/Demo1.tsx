@@ -1,26 +1,227 @@
-"use client";
+"use client"
 
-import { useCanvasDemo } from "@/lib/use-canvas-demo";
+import { useCanvasDemo } from "@/lib/use-canvas-demo"
+import { compileShader } from "../../lib/webgl/compileShader"
+import { createProgram } from "../../lib/webgl/createProgram"
+import { resizeCanvasToDisplaySize } from "../../lib/canvas"
+import { xAxisPositions, yAxisPositions } from "./objects/axis"
+import { rectPositions } from "./objects/rectangle"
+import Link from "next/link"
+
+const vertexShaderSource = `#version 300 es
+ 
+// an attribute is an input (in) to a vertex shader.
+// It will receive data from a buffer
+in vec2 a_position;
+// pixel length of a single length unit
+uniform float u_unit_scale;
+// object transformation scale, 1 = 1 unit
+uniform float u_scale;
+uniform vec2 u_resolution;
+uniform mat2 u_transform;
+ 
+// all shaders have a main function
+void main() {
+ 
+  vec2 pixel_length = 2.0 / u_resolution;
+  // gl_Position = vec4(mat2(0.87, -0.5, 0.5, 0.87) * a_position, 0, 1);
+  gl_Position = vec4(u_transform * a_position * pixel_length * u_scale * u_unit_scale, 0, 1);
+  // gl_Position = vec4(a_position, 0, 1);
+}
+`
+
+const fragmentShaderSource = `#version 300 es
+ 
+// fragment shaders don't have a default precision so we need
+// to pick one. highp is a good default. It means "high precision"
+precision highp float;
+uniform vec4 u_color;
+ 
+// we need to declare an output for the fragment shader
+out vec4 outColor;
+ 
+void main() {
+  // Just set the output to a constant reddish-purple
+  outColor = u_color;
+}
+`
+
+function checkGLError(gl: WebGL2RenderingContext, label: string) {
+  const error = gl.getError()
+
+  if (error !== gl.NO_ERROR) {
+    console.error(`${label}: WebGL error`, error)
+  }
+}
+
+const axisSize = 100
+const dpr = () => window.devicePixelRatio || 1
+
+type ColorV = [number, number, number, number]
+
+const randomColor = (): ColorV => [
+  Math.random(),
+  Math.random(),
+  Math.random(),
+  1,
+]
+
+type DrawOpts = {
+  transform?: [number, number, number, number]
+}
+
+type BindVaoOpts = {
+  gl: WebGL2RenderingContext
+  program: WebGLProgram
+  positions: Float32Array
+  scale?: number
+  primitiveType?: number
+  color?: ColorV
+  getDrawOpts?: () => DrawOpts
+}
+
+export const bindVao = ({
+  gl,
+  program,
+  positions,
+  scale = 1,
+  primitiveType = gl.TRIANGLES,
+  color = randomColor(),
+  getDrawOpts = (): DrawOpts => ({}),
+}: BindVaoOpts) => {
+  const positionAttributeLocation = gl.getAttribLocation(program, "a_position")
+  const positionBuffer = gl.createBuffer()
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW)
+  const vao = gl.createVertexArray()
+  gl.bindVertexArray(vao)
+  gl.enableVertexAttribArray(positionAttributeLocation)
+  gl.vertexAttribPointer(
+    positionAttributeLocation,
+    2, // size (num components)
+    gl.FLOAT, // type of data in buffer
+    false, // normalize
+    0, // stride (0 = compute from size and type)
+    0, // offset in buffer
+  )
+  return {
+    vao,
+    draw: () => {
+      const { transform = [1, 0, 0, 1] } = getDrawOpts()
+      gl.bindVertexArray(vao)
+      gl.uniform1f(gl.getUniformLocation(program, "u_unit_scale"), 100 * dpr())
+      gl.uniform1f(gl.getUniformLocation(program, "u_scale"), scale)
+      gl.uniform4fv(gl.getUniformLocation(program, "u_color"), color)
+      gl.uniform2f(
+        gl.getUniformLocation(program, "u_resolution"),
+        gl.canvas.width,
+        gl.canvas.height,
+      )
+      gl.uniformMatrix2fv(
+        gl.getUniformLocation(program, "u_transform"),
+        false,
+        transform,
+      )
+
+      gl.drawArrays(primitiveType, 0, positions.length / 2)
+      checkGLError(gl, "drawArrays")
+    },
+  }
+}
+
+const transformByAngle = (angle: number): [number, number, number, number] => {
+  const angleRad = (angle * Math.PI) / 180
+  const cos = Math.cos(angleRad)
+  const sin = Math.sin(angleRad)
+  return [cos, -sin, sin, cos]
+}
 
 const setup = (canvas: HTMLCanvasElement) => {
-  const gl = canvas.getContext("webgl2");
+  const gl = canvas.getContext("webgl2")
 
   if (!gl) {
-    throw new Error("WebGL2 is not available in this browser.");
+    throw new Error("WebGL2 is not available in this browser.")
   }
-};
+
+  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexShaderSource)
+  const fragmentShader = compileShader(
+    gl,
+    gl.FRAGMENT_SHADER,
+    fragmentShaderSource,
+  )
+
+  const program = createProgram(gl, vertexShader, fragmentShader)
+  const axisColor: ColorV = [0.5, 0, 0, 1]
+  const unitColor: ColorV = [0, 1, 0, 1]
+  const rectConf = bindVao({
+    gl,
+    program,
+    positions: rectPositions,
+    getDrawOpts: () => ({
+      transform: transformByAngle(-Math.floor((Date.now() / 100) * 10) % 360),
+    }),
+  })
+  const drawConfigs = [
+    bindVao({
+      gl,
+      program,
+      positions: xAxisPositions,
+      scale: axisSize,
+      color: axisColor,
+      primitiveType: gl.LINES,
+    }),
+    bindVao({
+      gl,
+      program,
+      positions: yAxisPositions,
+      scale: axisSize,
+      color: axisColor,
+      primitiveType: gl.LINES,
+    }),
+    bindVao({
+      gl,
+      program,
+      positions: xAxisPositions,
+      color: unitColor,
+      primitiveType: gl.LINES,
+    }),
+    bindVao({
+      gl,
+      program,
+      positions: yAxisPositions,
+      color: unitColor,
+      primitiveType: gl.LINES,
+    }),
+    rectConf,
+  ]
+
+  const render = () => {
+    resizeCanvasToDisplaySize(canvas)
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
+    gl.clearColor(0, 0, 0, 0)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+    gl.useProgram(program)
+
+    for (const drawConfig of drawConfigs) {
+      drawConfig.draw()
+    }
+    requestAnimationFrame(render)
+  }
+
+  requestAnimationFrame(render)
+}
 
 export function Demo1() {
-  const { ariaLabel, canvasRef } = useCanvasDemo(
+  const { ariaLabel, canvasRef, error } = useCanvasDemo(
     setup,
-    "Raw WebGL2 triangle demo"
-  );
+    "Raw WebGL2 triangle demo",
+  )
 
   return (
-    <canvas
-      aria-label={ariaLabel}
-      className="demo-canvas"
-      ref={canvasRef}
-    />
-  );
+    <>
+      Demo 1: Rotation <Link href="/">Back</Link>
+      <canvas aria-label={ariaLabel} className="demo-canvas" ref={canvasRef} />
+      {error && <p className="error">{error}</p>}
+    </>
+  )
 }
