@@ -7,10 +7,10 @@ import { resizeCanvasToDisplaySize } from "../../lib/canvas"
 import { xAxisPositions, yAxisPositions } from "./objects/axis"
 import { rectPositions } from "./objects/rectangle"
 import Link from "next/link"
-import { Mat3 } from "../../lib/math/Mat3"
-import { mat3Mult } from "../../lib/math/mat3Mult"
-import { mat3TransformScale } from "../../lib/math/mat3TransformScale"
-import { mat3TransformTranslate } from "../../lib/math/mat3TransformTranslate"
+import { Mat3 } from "../../lib/math/mat3/Mat3"
+import { mat3Mult } from "../../lib/math/mat3/mat3Mult"
+import { mat3TransformScale } from "../../lib/math/mat3/mat3TransformScale"
+import { mat3TransformTranslate } from "../../lib/math/mat3/mat3TransformTranslate"
 
 const vertexShaderSource = `#version 300 es
  

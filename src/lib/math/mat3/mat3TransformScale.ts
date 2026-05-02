@@ -1,4 +1,4 @@
-import { mat2TransformScale } from "./mat2TransformScale"
+import { mat2TransformScale } from "../mat2/mat2TransformScale"
 import { Mat3 } from "./Mat3"
 
 export const mat3TransformScale = (scaleX: number, scaleY?: number): Mat3 => {

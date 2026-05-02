@@ -2,9 +2,16 @@
 
 import { useEffect, useRef, useState } from "react"
 
-type CanvasSetup = (canvas: HTMLCanvasElement) => void | (() => void)
+type CanvasSetup<Opts> = (
+  canvas: HTMLCanvasElement,
+  opts: Opts,
+) => void | (() => void)
 
-export function useCanvasDemo(setup: CanvasSetup, label: string) {
+export function useCanvasDemo<Opts>(
+  setup: CanvasSetup<Opts>,
+  label: string,
+  opts: Opts,
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -16,7 +23,7 @@ export function useCanvasDemo(setup: CanvasSetup, label: string) {
     }
 
     try {
-      return setup(canvas)
+      return setup(canvas, opts)
     } catch (caughtError) {
       console.error("Error during canvas setup:", caughtError)
       setError(
