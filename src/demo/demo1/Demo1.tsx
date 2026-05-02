@@ -7,9 +7,10 @@ import { resizeCanvasToDisplaySize } from "../../lib/canvas"
 import { xAxisPositions, yAxisPositions } from "./objects/axis"
 import { rectPositions } from "./objects/rectangle"
 import Link from "next/link"
-import { Mat2 } from "@/lib/math/Mat2"
-import { mat2TransformScale } from "../../lib/math/mat2TransformScale"
-import { mat2Mult } from "../../lib/math/mat2Mult"
+import { Mat3 } from "../../lib/math/Mat3"
+import { mat3Mult } from "../../lib/math/mat3Mult"
+import { mat3TransformScale } from "../../lib/math/mat3TransformScale"
+import { mat3TransformTranslate } from "../../lib/math/mat3TransformTranslate"
 
 const vertexShaderSource = `#version 300 es
  
@@ -17,13 +18,11 @@ const vertexShaderSource = `#version 300 es
 // It will receive data from a buffer
 in vec2 a_position;
 // pixel length of a single length unit
-uniform mat2 u_transform;
+uniform mat3 u_transform;
  
 // all shaders have a main function
 void main() {
-  // gl_Position = vec4(mat2(0.87, -0.5, 0.5, 0.87) * a_position, 0, 1);
-  gl_Position = vec4(u_transform * a_position, 0, 1);
-  // gl_Position = vec4(a_position, 0, 1);
+  gl_Position = vec4((u_transform * vec3(a_position, 1)).xy, 0, 1);
 }
 `
 
@@ -64,7 +63,7 @@ const randomColor = (): ColorV => [
 ]
 
 type DrawOpts = {
-  transform?: [number, number, number, number]
+  transform?: Mat3
 }
 
 type BindVaoOpts = {
@@ -104,19 +103,19 @@ export const bindVao = ({
   return {
     vao,
     draw: () => {
-      const { transform = [1, 0, 0, 1] } = getDrawOpts()
+      const { transform = [1, 0, 0, 0, 1, 0, 0, 0, 1] } = getDrawOpts()
 
       // 1 unit = 20 CSS pixels
       const unitScale = 20 * dpr()
 
-      const transformInput = mat2Mult(
+      const transformInput = mat3Mult(
         transform,
-        mat2TransformScale(unitScale * scale, unitScale * scale),
+        mat3TransformScale(unitScale * scale, unitScale * scale),
         transformByPixelScale(gl.canvas.width, gl.canvas.height),
       )
       gl.bindVertexArray(vao)
       gl.uniform4fv(gl.getUniformLocation(program, "u_color"), color)
-      gl.uniformMatrix2fv(
+      gl.uniformMatrix3fv(
         gl.getUniformLocation(program, "u_transform"),
         false,
         transformInput,
@@ -129,14 +128,14 @@ export const bindVao = ({
 }
 
 // Scale matrix from 1 width, 1 height unit to 1 pixel unit
-const transformByPixelScale = (width: number, height: number): Mat2 =>
-  mat2TransformScale(1 / width, 1 / height)
+const transformByPixelScale = (width: number, height: number): Mat3 =>
+  mat3TransformScale(1 / width, 1 / height)
 
-const transformByAngle = (angle: number): Mat2 => {
+const transformByAngle = (angle: number): Mat3 => {
   const angleRad = (angle * Math.PI) / 180
   const cos = Math.cos(angleRad)
   const sin = Math.sin(angleRad)
-  return [cos, -sin, sin, cos]
+  return [cos, -sin, 0, sin, cos, 0, 0, 0, 1]
 }
 
 const setup = (canvas: HTMLCanvasElement) => {
@@ -160,9 +159,20 @@ const setup = (canvas: HTMLCanvasElement) => {
     gl,
     program,
     positions: rectPositions,
-    getDrawOpts: () => ({
-      transform: transformByAngle(-Math.floor((Date.now() / 100) * 10) % 360),
-    }),
+    getDrawOpts: () => {
+      const scaleDuration = 1000
+      const scale =
+        1 -
+        Math.abs(((Date.now() % (scaleDuration * 2)) / scaleDuration - 1) * 0.7)
+      return {
+        transform: mat3Mult(
+          mat3TransformTranslate(-7.5, -5),
+          mat3TransformScale(scale),
+          transformByAngle(-Math.floor((Date.now() / 100) * 10) % 360),
+          mat3TransformTranslate(7.5, 5),
+        ),
+      }
+    },
   })
   const drawConfigs = [
     bindVao({
