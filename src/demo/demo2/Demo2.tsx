@@ -163,7 +163,7 @@ export const bindVao = (opts: BindVaoOpts) => {
         pixel: {
           width: gl.canvas.width,
           height: gl.canvas.height,
-          depth: gl.canvas.height,
+          depth: unitScale * 1000,
         },
         unit: {
           unitPixelSize: unitScale,
@@ -243,12 +243,14 @@ const setup = (canvas: HTMLCanvasElement) => {
     return { positionTransform: mat4Id() }
   }
 
+  const fScale = 0.03
+
   const letterFConf = bindVao({
     gl,
     program,
     vertices: letterFPositions,
     modelTransform: mat4Mult(
-      mat4TransformScale(0.01, -0.01, 0.01),
+      mat4TransformScale(fScale, -fScale, fScale),
       mat4TransformTranslate(-50, -75, 0),
     ),
     getDrawOpts,
@@ -258,7 +260,7 @@ const setup = (canvas: HTMLCanvasElement) => {
     program,
     vertices: letterFPositions,
     modelTransform: mat4Mult(
-      mat4TransformScale(0.01, -0.01, 0.01),
+      mat4TransformScale(fScale, -fScale, fScale),
       mat4TransformByAngleY(-90),
       mat4TransformTranslate(0, -75, 50),
     ),
