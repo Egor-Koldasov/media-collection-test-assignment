@@ -7,6 +7,9 @@ import { resizeCanvasToDisplaySize } from "../../lib/canvas"
 import { xAxisPositions, yAxisPositions } from "./objects/axis"
 import { rectPositions } from "./objects/rectangle"
 import Link from "next/link"
+import { Mat2 } from "@/lib/math/Mat2"
+import { mat2TransformScale } from "../../lib/math/mat2TransformScale"
+import { mat2Mult } from "../../lib/math/mat2Mult"
 
 const vertexShaderSource = `#version 300 es
  
@@ -14,18 +17,12 @@ const vertexShaderSource = `#version 300 es
 // It will receive data from a buffer
 in vec2 a_position;
 // pixel length of a single length unit
-uniform float u_unit_scale;
-// object transformation scale, 1 = 1 unit
-uniform float u_scale;
-uniform vec2 u_resolution;
 uniform mat2 u_transform;
  
 // all shaders have a main function
 void main() {
- 
-  vec2 pixel_length = 2.0 / u_resolution;
   // gl_Position = vec4(mat2(0.87, -0.5, 0.5, 0.87) * a_position, 0, 1);
-  gl_Position = vec4(u_transform * a_position * pixel_length * u_scale * u_unit_scale, 0, 1);
+  gl_Position = vec4(u_transform * a_position, 0, 1);
   // gl_Position = vec4(a_position, 0, 1);
 }
 `
@@ -108,19 +105,21 @@ export const bindVao = ({
     vao,
     draw: () => {
       const { transform = [1, 0, 0, 1] } = getDrawOpts()
-      gl.bindVertexArray(vao)
-      gl.uniform1f(gl.getUniformLocation(program, "u_unit_scale"), 100 * dpr())
-      gl.uniform1f(gl.getUniformLocation(program, "u_scale"), scale)
-      gl.uniform4fv(gl.getUniformLocation(program, "u_color"), color)
-      gl.uniform2f(
-        gl.getUniformLocation(program, "u_resolution"),
-        gl.canvas.width,
-        gl.canvas.height,
+
+      // 1 unit = 20 CSS pixels
+      const unitScale = 20 * dpr()
+
+      const transformInput = mat2Mult(
+        transform,
+        mat2TransformScale(unitScale * scale, unitScale * scale),
+        transformByPixelScale(gl.canvas.width, gl.canvas.height),
       )
+      gl.bindVertexArray(vao)
+      gl.uniform4fv(gl.getUniformLocation(program, "u_color"), color)
       gl.uniformMatrix2fv(
         gl.getUniformLocation(program, "u_transform"),
         false,
-        transform,
+        transformInput,
       )
 
       gl.drawArrays(primitiveType, 0, positions.length / 2)
@@ -129,7 +128,11 @@ export const bindVao = ({
   }
 }
 
-const transformByAngle = (angle: number): [number, number, number, number] => {
+// Scale matrix from 1 width, 1 height unit to 1 pixel unit
+const transformByPixelScale = (width: number, height: number): Mat2 =>
+  mat2TransformScale(1 / width, 1 / height)
+
+const transformByAngle = (angle: number): Mat2 => {
   const angleRad = (angle * Math.PI) / 180
   const cos = Math.cos(angleRad)
   const sin = Math.sin(angleRad)
