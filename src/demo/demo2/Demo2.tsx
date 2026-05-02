@@ -15,6 +15,7 @@ import { mat4TransformByAngleX } from "../../lib/math/mat4/mat4TransformByAngleX
 import { mat4TransformByAngleY } from "../../lib/math/mat4/mat4TransformByAngleY"
 import { mat4TransformByAngleZ } from "../../lib/math/mat4/mat4TransformByAngleZ"
 import { proxy, useSnapshot } from "valtio"
+import { mat4TransformTranslate } from "../../lib/math/mat4/mat4TransformTranslate"
 
 const vertexShaderSource = `#version 300 es
  
@@ -72,44 +73,69 @@ const randomColor = (): ColorV => [
   1,
 ]
 
+const spaceClip = () => mat4Id()
+type SpacePixelOpts = {
+  pixel: { width: number; height: number; depth?: number }
+}
+const spacePixel = (opts: SpacePixelOpts) =>
+  mat4Mult(
+    spaceClip(),
+    mat4TransformScale(
+      2 / opts.pixel.width,
+      2 / opts.pixel.height,
+      2 / (opts.pixel.depth ?? opts.pixel.height),
+    ),
+  )
+type SpaceUnitOpts = SpacePixelOpts & {
+  unit: { unitPixelSize: number }
+}
+const spaceUnit = (opts: SpaceUnitOpts) =>
+  mat4Mult(
+    spacePixel(opts),
+    mat4TransformScale(
+      opts.unit.unitPixelSize,
+      opts.unit.unitPixelSize,
+      opts.unit.unitPixelSize,
+    ),
+  )
+
+const spaces = {
+  clip: spaceClip,
+  pixel: spacePixel,
+  unit: spaceUnit,
+}
+type Space = keyof typeof spaces
+
 type DrawOpts = {
-  transform?: Mat4
+  positionTransform?: Mat4
 }
 
 type BindVaoOpts = {
   gl: WebGL2RenderingContext
   program: WebGLProgram
-  positions: Float32Array
-  scale?: number
+  vertices: Float32Array
   primitiveType?: number
   color?: ColorV
-  getDrawOpts?: () => DrawOpts
+  space?: Space
+  getDrawOpts?: (conf: BindVaoOpts) => DrawOpts
+  /**
+   * This should normilize `positions`. Origin should be at the object's center.
+   * The size should be normilized to unit space.
+   */
+  modelTransform?: Mat4
 }
 
-const spaceClip = () => mat4Id()
-const spacePixel = (width: number, height: number, depth?: number) =>
-  mat4Mult(transformByPixelScale(width, height, depth ?? height), spaceClip())
-const spaceUnit = (unitPixelSize: number) =>
-  mat4Mult(
-    mat4TransformScale(unitPixelSize, unitPixelSize, unitPixelSize),
-    spacePixel(1, 1),
-  )
-
-const spaces = {
-  clip: spaceClip(),
-  pixel: spacePixel,
-  unit: spaceUnit,
-}
-
-export const bindVao = ({
-  gl,
-  program,
-  positions,
-  scale = 1,
-  primitiveType = gl.TRIANGLES,
-  color = randomColor(),
-  getDrawOpts = (): DrawOpts => ({}),
-}: BindVaoOpts) => {
+export const bindVao = (opts: BindVaoOpts) => {
+  const {
+    gl,
+    program,
+    vertices: positions,
+    primitiveType = gl.TRIANGLES,
+    color = randomColor(),
+    getDrawOpts = (): DrawOpts => ({}),
+    space = "unit",
+    modelTransform = mat4Id(),
+  } = opts
   const positionAttributeLocation = gl.getAttribLocation(program, "a_position")
   const positionBuffer = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
@@ -128,24 +154,26 @@ export const bindVao = ({
   return {
     vao,
     draw: () => {
-      const { transform = mat4Id() } = getDrawOpts()
+      const { positionTransform = mat4Id() } = getDrawOpts(opts)
 
       // 1 unit = 20 CSS pixels
       const unitScale = 40 * dpr()
 
-      const transformInput = mat4Mult(
-        transform,
+      const spaceTransform = spaces[space]({
+        pixel: {
+          width: gl.canvas.width,
+          height: gl.canvas.height,
+          depth: gl.canvas.height,
+        },
+        unit: {
+          unitPixelSize: unitScale,
+        },
+      })
 
-        transformByPixelScale(
-          gl.canvas.width,
-          gl.canvas.height,
-          gl.canvas.height,
-        ),
-        mat4TransformScale(
-          unitScale * scale,
-          unitScale * scale,
-          unitScale * scale,
-        ),
+      const transformInput = mat4Mult(
+        spaceTransform,
+        positionTransform,
+        modelTransform,
       )
       gl.bindVertexArray(vao)
       gl.uniform4fv(gl.getUniformLocation(program, "u_color"), color)
@@ -160,13 +188,6 @@ export const bindVao = ({
     },
   }
 }
-
-// Scale matrix from 1 width, 1 height unit to 1 pixel unit
-const transformByPixelScale = (
-  width: number,
-  height: number,
-  depth: number,
-): Mat4 => mat4TransformScale(2 / width, 2 / height, 2 / depth)
 
 const setup = (canvas: HTMLCanvasElement) => {
   const gl = canvas.getContext("webgl2")
@@ -205,69 +226,50 @@ const setup = (canvas: HTMLCanvasElement) => {
   //   },
   // })
 
-  const getDrawOpts = () => {
-    let viewportAngle = 45
+  const getDrawOpts = (confOpts: BindVaoOpts) => {
+    if (confOpts.space === "unit" || !confOpts.space) {
+      let viewportAngle = 45
 
-    viewportAngle = viewportAngle + 1
+      viewportAngle = viewportAngle + 1
 
-    const viewport = mat4Mult(
-      mat4TransformByAngleX(state.rotateX),
-      mat4TransformByAngleY(state.rotateY),
-      mat4TransformByAngleZ(state.rotateZ),
-    )
-    return { transform: viewport }
+      const viewport = mat4Mult(
+        mat4TransformByAngleX(state.rotateX),
+        mat4TransformByAngleY(state.rotateY),
+        mat4TransformByAngleZ(state.rotateZ),
+      )
+      return { positionTransform: viewport }
+    }
+
+    return { positionTransform: mat4Id() }
   }
 
   const letterFConf = bindVao({
     gl,
     program,
-    positions: letterFPositions,
-    scale: 0.01,
-    getDrawOpts: () => {
-      // const scaleDuration = 1000
-      // const scale =
-      //   1 -
-      //   Math.abs(((Date.now() % (scaleDuration * 2)) / scaleDuration - 1) * 0.7)
-      return {
-        transform: mat4Mult(
-          // mat4TransformTranslate(-7.5, -5),
-          mat4TransformScale(1, -1, 1),
-          getDrawOpts().transform,
-          // mat4TransformTranslate(-30, 0, 0),
-          // transformByAngle(-Math.floor((Date.now() / 100) * 10) % 360),
-          // mat3TransformTranslate(7.5, 5),
-        ),
-      }
-    },
+    vertices: letterFPositions,
+    modelTransform: mat4Mult(
+      mat4TransformScale(0.01, -0.01, 0.01),
+      mat4TransformTranslate(-50, -75, 0),
+    ),
+    getDrawOpts,
   })
   const letterFZConf = bindVao({
     gl,
     program,
-    positions: letterFZPositions,
-    scale: 0.01,
-    getDrawOpts: () => {
-      // const scaleDuration = 1000
-      // const scale =
-      //   1 -
-      //   Math.abs(((Date.now() % (scaleDuration * 2)) / scaleDuration - 1) * 0.7)
-      return {
-        transform: mat4Mult(
-          // mat4TransformTranslate(-7.5, -5),
-          mat4TransformScale(1, -1, 1),
-          getDrawOpts().transform,
-          // mat4TransformTranslate(-30, 0, 0),
-          // transformByAngle(-Math.floor((Date.now() / 100) * 10) % 360),
-          // mat3TransformTranslate(7.5, 5),
-        ),
-      }
-    },
+    vertices: letterFPositions,
+    modelTransform: mat4Mult(
+      mat4TransformScale(0.01, -0.01, 0.01),
+      mat4TransformByAngleY(-90),
+      mat4TransformTranslate(0, -75, 50),
+    ),
+    getDrawOpts,
   })
   const drawConfigs = [
     bindVao({
       gl,
       program,
-      positions: xAxisPositions,
-      scale: axisSize,
+      vertices: xAxisPositions,
+      space: "clip",
       color: [0.5, 0, 0, 1],
       primitiveType: gl.LINES,
       getDrawOpts,
@@ -275,8 +277,8 @@ const setup = (canvas: HTMLCanvasElement) => {
     bindVao({
       gl,
       program,
-      positions: yAxisPositions,
-      scale: axisSize,
+      vertices: yAxisPositions,
+      space: "clip",
       color: [0, 0.5, 0, 1],
       primitiveType: gl.LINES,
       getDrawOpts,
@@ -284,8 +286,8 @@ const setup = (canvas: HTMLCanvasElement) => {
     bindVao({
       gl,
       program,
-      positions: zAxisPositions,
-      scale: axisSize,
+      vertices: zAxisPositions,
+      space: "clip",
       color: [0.5, 0.5, 0.5, 1],
       primitiveType: gl.LINES,
       getDrawOpts,
@@ -293,7 +295,7 @@ const setup = (canvas: HTMLCanvasElement) => {
     bindVao({
       gl,
       program,
-      positions: xAxisPositions,
+      vertices: xAxisPositions,
       color: [1, 0, 0, 1],
       primitiveType: gl.LINES,
       getDrawOpts,
@@ -301,7 +303,7 @@ const setup = (canvas: HTMLCanvasElement) => {
     bindVao({
       gl,
       program,
-      positions: yAxisPositions,
+      vertices: yAxisPositions,
       color: [0, 1, 0, 1],
       primitiveType: gl.LINES,
       getDrawOpts,
@@ -309,7 +311,7 @@ const setup = (canvas: HTMLCanvasElement) => {
     bindVao({
       gl,
       program,
-      positions: zAxisPositions,
+      vertices: zAxisPositions,
       color: [1, 1, 1, 1],
       primitiveType: gl.LINES,
       getDrawOpts,
