@@ -24,10 +24,14 @@ const vertexShaderSource = `#version 300 es
 in vec4 a_position;
 // pixel length of a single length unit
 uniform mat4 u_transform;
+float u_fudgeFactor;
  
 // all shaders have a main function
 void main() {
-  gl_Position = u_transform * a_position;
+  u_fudgeFactor = 40.0;
+  vec4 position = u_transform * a_position;
+  float zToDivideBy = 1.0 + position.z * u_fudgeFactor;
+  gl_Position = vec4(position.xyz / zToDivideBy, zToDivideBy);
 }
 `
 
@@ -202,6 +206,9 @@ const setup = (canvas: HTMLCanvasElement) => {
     gl.FRAGMENT_SHADER,
     fragmentShaderSource,
   )
+
+  // gl.enable(gl.CULL_FACE)
+  gl.enable(gl.DEPTH_TEST)
 
   const program = createProgram(gl, vertexShader, fragmentShader)
   const axisColor: ColorV = [0.5, 0, 0, 1]
