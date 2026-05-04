@@ -5,7 +5,7 @@ import { compileShader } from "../../lib/webgl/compileShader"
 import { createProgram } from "../../lib/webgl/createProgram"
 import { resizeCanvasToDisplaySize } from "../../lib/canvas"
 import Link from "next/link"
-import { letterFPositions, letterFZPositions } from "./objects/letterF"
+import { letterFPositions } from "./objects/letterF"
 import { Mat4 } from "../../lib/math/mat4/Mat4"
 import { mat4Mult } from "../../lib/math/mat4/mat4Mult"
 import { mat4TransformScale } from "../../lib/math/mat4/mat4TransformScale"
@@ -16,6 +16,9 @@ import { mat4TransformByAngleY } from "../../lib/math/mat4/mat4TransformByAngleY
 import { mat4TransformByAngleZ } from "../../lib/math/mat4/mat4TransformByAngleZ"
 import { proxy, useSnapshot } from "valtio"
 import { mat4TransformTranslate } from "../../lib/math/mat4/mat4TransformTranslate"
+import { StateSlider } from "../../lib/components/StateSlider"
+import { mat4TransformProjectZToW } from "../../lib/math/mat4/mat4TransformProjectZToW"
+import { mat4TransformPerspective } from "../../lib/math/mat4/mat4TransformPerspective"
 
 const vertexShaderSource = `#version 300 es
  
@@ -24,14 +27,11 @@ const vertexShaderSource = `#version 300 es
 in vec4 a_position;
 // pixel length of a single length unit
 uniform mat4 u_transform;
-float u_fudgeFactor;
  
 // all shaders have a main function
 void main() {
-  u_fudgeFactor = 40.0;
   vec4 position = u_transform * a_position;
-  float zToDivideBy = 1.0 + position.z * u_fudgeFactor;
-  gl_Position = vec4(position.xyz / zToDivideBy, zToDivideBy);
+  gl_Position = position;
 }
 `
 
@@ -53,8 +53,9 @@ void main() {
 
 const state = proxy({
   rotateX: 0,
-  rotateY: 45,
+  rotateY: 0,
   rotateZ: 0,
+  translateZ: -5,
 })
 
 function checkGLError(gl: WebGL2RenderingContext, label: string) {
@@ -96,11 +97,8 @@ type SpaceUnitOpts = SpacePixelOpts & {
 const spaceUnit = (opts: SpaceUnitOpts) =>
   mat4Mult(
     spacePixel(opts),
-    mat4TransformScale(
-      opts.unit.unitPixelSize,
-      opts.unit.unitPixelSize,
-      opts.unit.unitPixelSize,
-    ),
+    mat4TransformPerspective(45, 1, 1, 10),
+    mat4TransformScale(opts.unit.unitPixelSize, opts.unit.unitPixelSize, 1),
   )
 
 const spaces = {
@@ -167,7 +165,7 @@ export const bindVao = (opts: BindVaoOpts) => {
         pixel: {
           width: gl.canvas.width,
           height: gl.canvas.height,
-          depth: unitScale * 1000,
+          depth: 2000,
         },
         unit: {
           unitPixelSize: unitScale,
@@ -240,6 +238,7 @@ const setup = (canvas: HTMLCanvasElement) => {
       viewportAngle = viewportAngle + 1
 
       const viewport = mat4Mult(
+        mat4TransformTranslate(0, 0, state.translateZ),
         mat4TransformByAngleX(state.rotateX),
         mat4TransformByAngleY(state.rotateY),
         mat4TransformByAngleZ(state.rotateZ),
@@ -274,33 +273,33 @@ const setup = (canvas: HTMLCanvasElement) => {
     getDrawOpts,
   })
   const drawConfigs = [
-    bindVao({
-      gl,
-      program,
-      vertices: xAxisPositions,
-      space: "clip",
-      color: [0.5, 0, 0, 1],
-      primitiveType: gl.LINES,
-      getDrawOpts,
-    }),
-    bindVao({
-      gl,
-      program,
-      vertices: yAxisPositions,
-      space: "clip",
-      color: [0, 0.5, 0, 1],
-      primitiveType: gl.LINES,
-      getDrawOpts,
-    }),
-    bindVao({
-      gl,
-      program,
-      vertices: zAxisPositions,
-      space: "clip",
-      color: [0.5, 0.5, 0.5, 1],
-      primitiveType: gl.LINES,
-      getDrawOpts,
-    }),
+    // bindVao({
+    //   gl,
+    //   program,
+    //   vertices: xAxisPositions,
+    //   space: "clip",
+    //   color: [0.5, 0, 0, 1],
+    //   primitiveType: gl.LINES,
+    //   getDrawOpts,
+    // }),
+    // bindVao({
+    //   gl,
+    //   program,
+    //   vertices: yAxisPositions,
+    //   space: "clip",
+    //   color: [0, 0.5, 0, 1],
+    //   primitiveType: gl.LINES,
+    //   getDrawOpts,
+    // }),
+    // bindVao({
+    //   gl,
+    //   program,
+    //   vertices: zAxisPositions,
+    //   space: "clip",
+    //   color: [0.5, 0.5, 0.5, 1],
+    //   primitiveType: gl.LINES,
+    //   getDrawOpts,
+    // }),
     bindVao({
       gl,
       program,
@@ -353,41 +352,20 @@ export function Demo2() {
     undefined,
   )
   const snap = useSnapshot(state)
+  const sliderKeys = Object.keys(state) as (keyof typeof state)[]
 
   return (
     <>
       Demo 2: 3D WebGL basics <Link href="/">Back</Link>
       <div>
-        <div>
-          <input
-            type="range"
-            min={0}
-            max={360}
-            value={snap.rotateX}
-            onChange={(e) => (state.rotateX = Number(e.target.value))}
+        {sliderKeys.map((sliderKey) => (
+          <StateSlider
+            key={sliderKey}
+            label={sliderKey}
+            value={snap[sliderKey]}
+            onChange={(value) => (state[sliderKey] = value)}
           />
-          X: {snap.rotateX}
-        </div>
-        <div>
-          <input
-            type="range"
-            min={0}
-            max={360}
-            value={snap.rotateY}
-            onChange={(e) => (state.rotateY = Number(e.target.value))}
-          />
-          Y: {snap.rotateY}
-        </div>
-        <div>
-          <input
-            type="range"
-            min={0}
-            max={360}
-            value={snap.rotateZ}
-            onChange={(e) => (state.rotateZ = Number(e.target.value))}
-          />
-          Z: {snap.rotateZ}
-        </div>
+        ))}
       </div>
       <canvas aria-label={ariaLabel} className="demo-canvas" ref={canvasRef} />
       {error && <p className="error">{error}</p>}
