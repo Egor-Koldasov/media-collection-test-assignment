@@ -56,7 +56,21 @@ const state = proxy({
   rotateY: 0,
   rotateZ: 0,
   translateZ: -5,
+  fovDegrees: 45,
+  near: 0.1,
+  far: 1000,
+  perspective: true,
 })
+
+const sliderKeys = [
+  "rotateX",
+  "rotateY",
+  "rotateZ",
+  "translateZ",
+  "fovDegrees",
+  "near",
+  "far",
+] as const
 
 function checkGLError(gl: WebGL2RenderingContext, label: string) {
   const error = gl.getError()
@@ -85,11 +99,11 @@ type SpacePixelOpts = {
 const spacePixel = (opts: SpacePixelOpts) =>
   mat4Mult(
     spaceClip(),
-    mat4TransformScale(
-      2 / opts.pixel.width,
-      2 / opts.pixel.height,
-      2 / (opts.pixel.depth ?? opts.pixel.height),
-    ),
+    // mat4TransformScale(
+    //   2 / opts.pixel.width,
+    //   2 / opts.pixel.height,
+    //   2 / (opts.pixel.depth ?? opts.pixel.height),
+    // ),
   )
 type SpaceUnitOpts = SpacePixelOpts & {
   unit: { unitPixelSize: number }
@@ -97,8 +111,15 @@ type SpaceUnitOpts = SpacePixelOpts & {
 const spaceUnit = (opts: SpaceUnitOpts) =>
   mat4Mult(
     spacePixel(opts),
-    mat4TransformPerspective(45, 1, 1, 10),
-    mat4TransformScale(opts.unit.unitPixelSize, opts.unit.unitPixelSize, 1),
+    // mat4TransformScale(opts.unit.unitPixelSize, opts.unit.unitPixelSize, 1),
+    state.perspective
+      ? mat4TransformPerspective(
+          state.fovDegrees,
+          opts.pixel.width / opts.pixel.height,
+          state.near,
+          state.far,
+        )
+      : mat4Id(),
   )
 
 const spaces = {
@@ -352,12 +373,16 @@ export function Demo2() {
     undefined,
   )
   const snap = useSnapshot(state)
-  const sliderKeys = Object.keys(state) as (keyof typeof state)[]
 
   return (
     <>
       Demo 2: 3D WebGL basics <Link href="/">Back</Link>
       <div>
+        <canvas
+          aria-label={ariaLabel}
+          className="demo-canvas"
+          ref={canvasRef}
+        />
         {sliderKeys.map((sliderKey) => (
           <StateSlider
             key={sliderKey}
@@ -366,8 +391,16 @@ export function Demo2() {
             onChange={(value) => (state[sliderKey] = value)}
           />
         ))}
+        <div style={{ display: "flex", maxWidth: 200 }}>
+          <span>perspective:</span>
+          <input
+            style={{ marginLeft: "auto" }}
+            type="checkbox"
+            checked={snap.perspective}
+            onChange={(e) => (state.perspective = e.target.checked)}
+          />
+        </div>
       </div>
-      <canvas aria-label={ariaLabel} className="demo-canvas" ref={canvasRef} />
       {error && <p className="error">{error}</p>}
     </>
   )
