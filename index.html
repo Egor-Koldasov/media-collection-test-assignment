@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050807" />
+    <meta name="description" content="Last Lantern — an automatic Three.js survival experiment." />
+    <title>Last Lantern — Three.js survival experiment</title>
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="world" aria-label="The Last Lantern battlefield"></canvas>
+      <div class="atmosphere" aria-hidden="true"></div>
+
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand__sigil">✦</span>
+          <div>
+            <strong>LAST LANTERN</strong>
+            <small>AUTOMATIC SURVIVAL / 01</small>
+          </div>
+        </div>
+
+        <section class="objective" aria-label="Survival objective">
+          <div class="objective__label"><span>SURVIVE THE VIGIL</span><span id="phase-label">THREAT I</span></div>
+          <div class="objective__time"><strong id="timer">20:00</strong><small>UNTIL DAWN</small></div>
+          <div class="timeline"><i id="time-fill"></i><b id="event-marker"></b></div>
+          <small id="next-event">FIRST CONTACT · 0:04</small>
+        </section>
+
+        <nav class="time-controls" aria-label="Time controls">
+          <button id="pause" class="icon-button" aria-label="Pause">Ⅱ</button>
+          <span></span>
+          <button class="speed active" data-speed="1">1×</button>
+          <button class="speed" data-speed="4">4×</button>
+          <button class="speed" data-speed="12">12×</button>
+        </nav>
+      </header>
+
+      <aside class="squad panel">
+        <div class="panel__title">
+          <span>BOUND COMPANY</span>
+          <small id="alive-count">1 SOUL BOUND</small>
+        </div>
+        <div id="squad-list" class="squad__list"></div>
+      </aside>
+
+      <aside class="threat panel">
+        <div class="threat__dial">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="dial-track" cx="50" cy="50" r="43"></circle>
+            <circle id="threat-arc" cx="50" cy="50" r="43"></circle>
+          </svg>
+          <div><small>THREAT</small><strong id="threat-level">I</strong></div>
+        </div>
+        <div class="threat__copy">
+          <strong id="enemy-count">0 HOSTILES</strong>
+          <small id="wave-label">THE MIST IS STIRRING</small>
+        </div>
+      </aside>
+
+      <section id="combat-feed" class="combat-feed" aria-label="Combat log" aria-live="polite"></section>
+      <section id="ability-dock" class="ability-dock" aria-label="Selected unit ability cycle"></section>
+
+      <div class="corner-controls">
+        <button id="toggle-ui" class="round-button" title="Hide interface" aria-label="Hide interface">⌁</button>
+        <button id="help" class="round-button" title="How to play" aria-label="How to play">?</button>
+      </div>
+
+      <section id="intro" class="modal intro open" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+        <div class="modal__ornament"><span></span><b>✦</b><span></span></div>
+        <small>AN AUTOMATIC SURVIVAL EXPERIMENT</small>
+        <h1 id="intro-title">Keep the last<br /><em>lantern burning.</em></h1>
+        <p>Your constructs think for themselves. You decide only what they become—and the order in which they remember how to fight.</p>
+        <div class="intro__rules">
+          <article><b>01</b><div><strong>SEQUENTIAL</strong><span>Abilities always fire in strict order.</span></div></article>
+          <article><b>02</b><div><strong>ACTION POWER</strong><span>Every invocation waits for enough AP.</span></div></article>
+          <article><b>03</b><div><strong>TWENTY MINUTES</strong><span>Time is the only victory condition.</span></div></article>
+        </div>
+        <button id="begin" class="primary">BEGIN THE VIGIL <span>→</span></button>
+        <small class="modal__hint">USE 12× TO TEST THE FULL RUN IN UNDER TWO MINUTES</small>
+      </section>
+
+      <section id="upgrade-modal" class="modal upgrade" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
+        <div class="modal__ornament"><span></span><b>◇</b><span></span></div>
+        <small>THE LANTERN ANSWERS</small>
+        <h2 id="upgrade-title">Choose a blessing.</h2>
+        <p>First bind a recipient, then choose one of three irreversible alterations.</p>
+        <div id="upgrade-units" class="upgrade__units"></div>
+        <div id="upgrade-grid" class="upgrade__grid"></div>
+      </section>
+
+      <section id="reorder-modal" class="modal reorder" role="dialog" aria-modal="true" aria-labelledby="reorder-title">
+        <div class="modal__ornament"><span></span><b>↕</b><span></span></div>
+        <small>ALTER THE RITUAL</small>
+        <h2 id="reorder-title">Ability sequence.</h2>
+        <p>The construct will wait for each invocation’s AP cost, cast it, then advance to the next.</p>
+        <div id="reorder-list" class="reorder__list"></div>
+        <button id="save-order" class="primary">SEAL THE ORDER <span>→</span></button>
+      </section>
+
+      <section id="end-modal" class="modal ending" role="dialog" aria-modal="true" aria-labelledby="end-title">
+        <div class="modal__ornament"><span></span><b>✦</b><span></span></div>
+        <small id="end-kicker"></small>
+        <h1 id="end-title"></h1>
+        <p id="end-copy"></p>
+        <div id="end-stats" class="ending__stats"></div>
+        <button id="restart" class="primary">BEGIN ANOTHER VIGIL <span>↻</span></button>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

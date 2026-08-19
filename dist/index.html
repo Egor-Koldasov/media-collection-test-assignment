@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07110f" />
+    <title>Last Lantern — Three.js survival prototype</title>
+    <script type="module" crossorigin src="/assets/index-DM-gS_MJ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BFT0lBo6.css">
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="world" aria-label="Last Lantern battlefield"></canvas>
+      <div class="vignette"></div>
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">✦</span><div><b>LAST LANTERN</b><small>THE NINTH VIGIL</small></div></div>
+        <div class="objective"><small>SURVIVE UNTIL DAWN</small><strong id="timer">20:00</strong><div class="timeline"><i id="time-fill"></i><span id="next-event">REINFORCEMENT · 1:20</span></div></div>
+        <div class="controls"><button id="pause" aria-label="Pause game">Ⅱ</button><button class="speed active" data-speed="1">1×</button><button class="speed" data-speed="4">4×</button><button class="speed" data-speed="12">12×</button></div>
+      </header>
+
+      <aside class="squad-panel panel">
+        <div class="panel-heading"><span>VIGIL COMPANY</span><small id="alive-count">3 SOULS BOUND</small></div>
+        <div id="squad-list"></div>
+      </aside>
+
+      <aside class="threat-panel panel">
+        <div class="threat-ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="43"/><circle id="threat-arc" cx="50" cy="50" r="43"/></svg><div><small>THREAT</small><b id="threat-level">I</b></div></div>
+        <div class="threat-copy"><strong id="enemy-count">0 HOSTILES</strong><small id="wave-label">THE MIST IS STIRRING</small></div>
+      </aside>
+
+      <div class="feed" id="feed" aria-live="polite"></div>
+      <div class="ability-dock" id="ability-dock"><small>SELECT A UNIT TO INSPECT ITS RITUAL</small></div>
+      <button class="help" id="help">?</button>
+
+      <div class="intro modal open" id="intro">
+        <div class="sigil">✦</div><small>AN AUTOMATED SURVIVAL EXPERIMENT</small>
+        <h1>Keep the last<br><em>lantern burning.</em></h1>
+        <p>Your constructs think for themselves. You merely decide what they become.</p>
+        <div class="intro-rules"><div><b>01</b><span>Abilities fire<br>in strict order</span></div><div><b>02</b><span>Every action<br>spends AP</span></div><div><b>03</b><span>Survive twenty<br>merciless minutes</span></div></div>
+        <button id="begin" class="primary">BEGIN THE VIGIL <span>→</span></button>
+      </div>
+
+      <div class="upgrade modal" id="upgrade-modal">
+        <button class="close-modal" id="close-upgrade">×</button>
+        <small>THE LANTERN ANSWERS</small><h2>Choose a blessing</h2>
+        <p>Choose the construct first, then bind one blessing to it.</p>
+        <div class="upgrade-units" id="upgrade-units"></div>
+        <div class="upgrade-grid" id="upgrade-grid"></div>
+      </div>
+
+      <div class="reorder modal" id="reorder-modal">
+        <button class="close-modal" id="close-reorder">×</button><small>ALTER THE RITUAL</small><h2>Ability sequence</h2>
+        <p>Drag abilities into the order this construct should invoke them.</p>
+        <div id="reorder-list"></div><button class="primary" id="save-order">SEAL THE ORDER</button>
+      </div>
+
+      <div class="end modal" id="end-modal"><div class="sigil">✦</div><small id="end-kicker"></small><h1 id="end-title"></h1><p id="end-copy"></p><button class="primary" id="restart">BEGIN ANOTHER VIGIL</button></div>
+    </div>
+  </body>
+</html>
