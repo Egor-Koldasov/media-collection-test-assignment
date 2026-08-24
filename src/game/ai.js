@@ -181,7 +181,7 @@ export function updateEnemyMovement(enemy,dt,context){
   const target=units.find((unit)=>unit.id===enemy.targetId&&unit.alive);if(!target)return null;
   enemy.processionFury=Math.max(0,(enemy.processionFury||0)-dt);const cohortLeader=enemy.cohortLeaderId?enemies.find((other)=>other.alive&&other.id===enemy.cohortLeaderId):null;
   if(enemy.cohortLeaderId&&enemy.cohortLeaderId!==enemy.id&&!cohortLeader&&!enemy.cohortBroken){enemy.cohortBroken=true;enemy.processionFury=4;enemy.ap=Math.min(enemy.maxAp,enemy.ap+enemy.maxAp*.16);enemy.justBrokeCohort=true}
-  const toTarget=normalize(target.x-enemy.x,target.y-enemy.y);const dist=toTarget.length;let desiredX=target.x,desiredY=target.y;
+  const toTarget=normalize(target.x-enemy.x,target.y-enemy.y);enemy.visualTargetX=target.x-enemy.x;const dist=toTarget.length;let desiredX=target.x,desiredY=target.y;
   const ai=enemy.template.ai;
   if(ai==='kite'||ai==='support'||ai==='bishop'||ai==='standard'){
     const preferred=ai==='standard'?5:enemy.range*.82;

@@ -21,6 +21,20 @@ function disposeObject(object){object?.traverse?.((child)=>{child.geometry?.disp
 
 const atlasTextureCache=new Map();
 const enemyArtOrder=['thrall','hound','pikeman','bowman','harvester','graveguard','cantor','standard','wraith','bishop','ossuary','giant'];
+const enemyFacingProfiles={
+  thrall:{native:-1,tracksTarget:false},
+  hound:{native:-1,tracksTarget:false},
+  pikeman:{native:-1,tracksTarget:false},
+  bowman:{native:1,tracksTarget:true},
+  harvester:{native:-1,tracksTarget:false},
+  graveguard:{native:-1,tracksTarget:false},
+  cantor:{native:1,tracksTarget:true},
+  standard:{native:-1,tracksTarget:true},
+  wraith:{native:1,tracksTarget:false},
+  bishop:{native:1,tracksTarget:true},
+  ossuary:{native:-1,tracksTarget:false},
+  giant:{native:-1,tracksTarget:false}
+};
 
 function atlasTexture(path){
   if(typeof window==='undefined')return null;
@@ -253,12 +267,12 @@ export function createSkeletonVisual(enemy){
 }
 
 export function createTreasureVisual(){
-  const group=new THREE.Group(),shadow=ellipse(.46,.13,flat(0x000000,.26),32),sprite=rigidAtlasPlane('/assets/reliquary-shine-atlas.png',2,2),pickTarget=plane(1.55,1.2,new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
-  shadow.position.set(0,-.34,-.12);sprite.scale.set(1.7,1.275,1);sprite.position.set(0,.02,.42);pickTarget.position.set(0,.02,.76);group.add(shadow,sprite,pickTarget);group.userData={shadow,sprite,pickTarget};return group;
+  const group=new THREE.Group(),shadow=ellipse(.23,.065,flat(0x000000,.26),32),sprite=rigidAtlasPlane('/assets/reliquary-shine-atlas.png',2,2),pickTarget=plane(1.05,.8,new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
+  shadow.position.set(0,-.17,-.12);sprite.scale.set(.85,.6375,1);sprite.position.set(0,.01,.42);pickTarget.position.set(0,.01,.76);group.add(shadow,sprite,pickTarget);group.userData={shadow,sprite,pickTarget};return group;
 }
 
 export function updateTreasureVisual(treasure,time=0){
-  const group=treasure?.mesh;if(!group?.userData?.sprite)return;const state=group.userData,sequence=[0,1,2,3,2,1],frame=sequence[Math.floor(time*.0032+treasure.id*.83)%sequence.length],registration=[[-.095,.015],[.094,.014],[-.092,-.015],[.093,-.014]][frame];group.position.set(treasure.x,treasure.y,.3);group.scale.setScalar(1);group.renderOrder=-12000-Math.round(treasure.y*100);state.sprite.userData.setAnimationFrame(frame);state.sprite.position.set(registration[0],.02+registration[1],.42);state.sprite.material.uniforms.uTint.value.set(treasure.hovered?0xffe8c2:treasure.state==='claimed'?0xffd7a0:0xffffff);state.shadow.material.opacity=treasure.hovered?.34:.24;
+  const group=treasure?.mesh;if(!group?.userData?.sprite)return;const state=group.userData,sequence=[0,1,2,3,2,1],frame=sequence[Math.floor(time*.0032+treasure.id*.83)%sequence.length],registration=[[-.0475,.0075],[.047,.007],[-.046,-.0075],[.0465,-.007]][frame];group.position.set(treasure.x,treasure.y,.3);group.scale.setScalar(1);group.renderOrder=-12000-Math.round(treasure.y*100);state.sprite.userData.setAnimationFrame(frame);state.sprite.position.set(registration[0],.01+registration[1],.42);state.sprite.material.uniforms.uTint.value.set(treasure.hovered?0xffe8c2:treasure.state==='claimed'?0xffd7a0:0xffffff);state.shadow.material.opacity=treasure.hovered?.34:.24;
 }
 
 export function disposeTreasureVisual(group){
@@ -267,11 +281,11 @@ export function disposeTreasureVisual(group){
 
 export function updateEntityVisual(entity,selected=false,time=0){
   if(!entity.mesh)return;entity.mesh.position.set(entity.x,entity.y,entity.kind==='hero'?.12:.08);setVisualDepth(entity.mesh,-10000-Math.round(entity.y*100));const ratio=Math.max(0,entity.hp/entity.maxHp);const hpBar=entity.mesh.userData.hp;if(hpBar){hpBar.userData.fill.scale.x=ratio;hpBar.userData.fill.position.x=-(hpBar.userData.width*(1-ratio))/2}
-  const speed=Math.hypot(entity.vx||0,entity.vy||0),motion=Math.min(1,speed/1.6),sprite=entity.mesh.userData.sprite,spriteUniforms=sprite?.userData?.spriteUniforms,phase=entity.visualPhase??entity.mesh.userData.phase??0,cadence=time*(entity.kind==='hero'?.0092:.0076)+phase,stride=Math.sin(cadence*Math.PI/2),previousVx=entity.mesh.userData.previousVx??entity.vx??0,acceleration=(entity.vx||0)-previousVx;entity.mesh.userData.previousVx=entity.vx||0;if(Math.abs(entity.vx||0)>.04)entity.mesh.userData.facing=entity.kind==='hero'?(entity.vx<0?-1:1):(entity.vx<0?1:-1);const facing=entity.mesh.userData.facing??(entity.kind==='hero'?1:-1),lean=Math.max(-1,Math.min(1,(entity.vx||0)*.28+acceleration*1.7));
+  const speed=Math.hypot(entity.vx||0,entity.vy||0),motion=Math.min(1,speed/1.6),sprite=entity.mesh.userData.sprite,spriteUniforms=sprite?.userData?.spriteUniforms,phase=entity.visualPhase??entity.mesh.userData.phase??0,cadence=time*(entity.kind==='hero'?.0092:.0076)+phase,stride=Math.sin(cadence*Math.PI/2),previousVx=entity.mesh.userData.previousVx??entity.vx??0,acceleration=(entity.vx||0)-previousVx;entity.mesh.userData.previousVx=entity.vx||0;const facingProfile=entity.kind==='hero'?null:enemyFacingProfiles[entity.type]||enemyFacingProfiles.thrall,targetFacingX=entity.pendingTargetId!=null&&Number.isFinite(entity.pendingTargetX)?entity.pendingTargetX-entity.x:entity.visualTargetX,facingX=facingProfile?.tracksTarget&&Math.abs(targetFacingX||0)>.04?targetFacingX:entity.vx||0;if(Math.abs(facingX)>.04){const direction=facingX<0?-1:1;entity.mesh.userData.facing=entity.kind==='hero'?direction:direction*facingProfile.native}const facing=entity.mesh.userData.facing??(entity.kind==='hero'?1:facingProfile.native),lean=Math.max(-1,Math.min(1,(entity.vx||0)*.28+acceleration*1.7));
   const action=entity.kind==='hero'?entity.mesh.userData.castPulse||0:entity.attackWindup>0?Math.min(1,.42+entity.attackWindup):0,gaitFrames=[1,0,2,0],frame=action>.16?3:motion>.075?gaitFrames[Math.floor(cadence)%gaitFrames.length]:0;sprite?.userData?.setAnimationFrame?.(frame);
   if(spriteUniforms){spriteUniforms.uTime.value=time*.001;spriteUniforms.uMotion.value=motion;spriteUniforms.uAction.value=action;spriteUniforms.uStride.value=stride;spriteUniforms.uLean.value=lean}
   if(entity.kind==='hero'){
-    const apRatio=Math.max(0,entity.ap/entity.maxAp),apBar=entity.mesh.userData.ap,body=entity.mesh.userData.body;apBar.userData.fill.scale.x=apRatio;apBar.userData.fill.position.x=-(apBar.userData.width*(1-apRatio))/2;hpBar.scale.set(selected?1.08:1,selected?1.85:1,1);apBar.scale.set(selected?1.08:1,selected?1.65:1,1);hpBar.userData.bg.material.color.set(selected?0xd8bd7e:0x050609);apBar.userData.bg.material.color.set(selected?0xd8bd7e:0x050609);hpBar.userData.fill.material.color.set(selected?0x78c78d:0x4f9d67);apBar.userData.fill.material.color.set(selected?0xa5afe0:0x7e89bd);body.scale.x=facing*(1+motion*Math.cos(cadence*Math.PI/2)*.018);body.scale.y=1+action*.028-motion*Math.abs(stride)*.012;body.rotation.z=-lean*facing*.028+stride*motion*.008;
+    const apRatio=Math.max(0,entity.ap/entity.maxAp),apBar=entity.mesh.userData.ap,body=entity.mesh.userData.body;apBar.userData.fill.scale.x=apRatio;apBar.userData.fill.position.x=-(apBar.userData.width*(1-apRatio))/2;hpBar.position.y=selected?-.785:-.79;apBar.position.y=selected?-.905:-.89;hpBar.scale.set(selected?1.06:1,selected?1.22:1,1);apBar.scale.set(selected?1.06:1,selected?1.22:1,1);hpBar.userData.bg.material.color.set(selected?0x211d16:0x050609);apBar.userData.bg.material.color.set(selected?0x211d16:0x050609);hpBar.userData.fill.material.color.set(selected?0x6ab27e:0x4f9d67);apBar.userData.fill.material.color.set(selected?0x929dcc:0x7e89bd);body.scale.x=facing*(1+motion*Math.cos(cadence*Math.PI/2)*.018);body.scale.y=1+action*.028-motion*Math.abs(stride)*.012;body.rotation.z=-lean*facing*.028+stride*motion*.008;
     entity.mesh.position.y+=Math.sin(time*.0022+phase)*.012+Math.abs(stride)*motion*.026;entity.mesh.position.x+=Math.cos(cadence*Math.PI/2)*motion*.006;entity.mesh.userData.castPulse*=.91;entity.mesh.userData.shield.material.opacity=entity.shield>0?.18+Math.sin(time*.004)*.07:0;entity.mesh.userData.shield.rotation.z+=.006;
     const riteHalo=entity.mesh.userData.riteHalo;if(riteHalo){const visible=Math.min(riteHalo.children.length,entity.traits?.length||0),radius=.58+Math.min(.18,visible*.022);riteHalo.children.forEach((mark,index)=>{mark.visible=index<visible;if(!mark.visible)return;const angle=time*.00072+mark.userData.phase;mark.position.x=Math.cos(angle)*radius;mark.position.y=Math.sin(angle)*radius*.72-.04;mark.rotation.z=-angle+Math.PI/4;mark.material.opacity=.48+Math.sin(time*.003+index)*.22});riteHalo.rotation.z=Math.sin(time*.0004+phase)*.08}const originRelic=entity.mesh.userData.originRelic;if(originRelic){originRelic.rotation.z=Math.sin(time*.0014+phase)*.018;const relicBreath=.62*(1+Math.sin(time*.0021+phase)*.025);originRelic.scale.set(relicBreath,relicBreath,1)}
   }else{
