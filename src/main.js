@@ -133,9 +133,9 @@ function renderRoster(snapshot) {
 
 function renderSequence(unit) {
   const reorderButton=$('#reorder-button');
-  if(!unit){sequence.innerHTML='<span class="fine-print">The litany is silent.</span>';sequence.dataset.signature='';reorderButton.disabled=true;reorderButton.title='No living litany remains';hideAbilityInspector();return}
+  if(!unit){sequence.innerHTML='<span class="fine-print">The litany is silent.</span>';sequence.dataset.signature='';sequence.style.gridTemplateColumns='';reorderButton.disabled=true;reorderButton.title='No living litany remains';hideAbilityInspector();return}
   reorderButton.disabled=!unit.alive||unit.abilities.length<2;reorderButton.title=unit.abilities.length<2?'This oathbound knows only one rite':'Rewrite this litany at any time';
-  sequence.style.gridTemplateColumns=`repeat(${unit.abilities.length},1fr)`;
+  sequence.style.gridTemplateColumns=unit.abilities.length===1?'72px':`repeat(${unit.abilities.length},1fr)`;
   const signature=`${unit.id}:${unit.abilities.map((ability)=>ability.id).join('|')}`;
   if(sequence.dataset.signature!==signature){
     sequence.dataset.signature=signature;

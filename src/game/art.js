@@ -61,6 +61,12 @@ function animatedAtlasPlane(path,columns,rows,frameCell,opacity=1){
   const sprite=new THREE.Mesh(new THREE.PlaneGeometry(1,1,12,18),material);sprite.userData.spriteUniforms=uniforms;sprite.userData.animationFrame=-1;sprite.userData.setAnimationFrame=(frame)=>{if(sprite.userData.animationFrame===frame)return;const [nextColumn,nextRow]=resolveCell(frame);uniforms.uCell.value.set(nextColumn,rows-nextRow-1);sprite.userData.animationFrame=frame};sprite.userData.setAnimationFrame(0);return sprite;
 }
 
+function rigidAtlasPlane(path,columns,rows){
+  const uniforms={uMap:{value:atlasTexture(path)},uAtlas:{value:new THREE.Vector2(columns,rows)},uCell:{value:new THREE.Vector2(0,rows-1)},uTint:{value:new THREE.Color(0xffffff)}};
+  const material=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`varying vec2 vUv;uniform sampler2D uMap;uniform vec2 uAtlas;uniform vec2 uCell;uniform vec3 uTint;void main(){vec4 painted=texture2D(uMap,(vUv+uCell)/uAtlas);float hi=max(painted.r,max(painted.g,painted.b));float lo=min(painted.r,min(painted.g,painted.b));float luma=dot(painted.rgb,vec3(.2126,.7152,.0722));float matte=smoothstep(.045,.12,luma+(hi-lo)*.35);painted.a*=matte;if(painted.a<.025)discard;gl_FragColor=vec4(painted.rgb*uTint,painted.a);}`});
+  const sprite=new THREE.Mesh(new THREE.PlaneGeometry(1,1),material);sprite.userData.animationFrame=-1;sprite.userData.setAnimationFrame=(frame)=>{const next=Math.max(0,Math.min(columns*rows-1,frame));if(sprite.userData.animationFrame===next)return;uniforms.uCell.value.set(next%columns,rows-Math.floor(next/columns)-1);sprite.userData.animationFrame=next};sprite.userData.setAnimationFrame(0);return sprite;
+}
+
 function makeRune(radius,angle,color=0x8e7056){
   const group=new THREE.Group();const x=Math.cos(angle)*radius,y=Math.sin(angle)*radius*.76;const mark=line([[-.12,0,0],[0,.22,0],[.12,0,0],[0,-.22,0],[-.12,0,0]],color,.55);mark.position.set(x,y,-.88);mark.rotation.z=angle;group.add(mark);return group;
 }
@@ -241,12 +247,12 @@ export function createSkeletonVisual(enemy){
 }
 
 export function createTreasureVisual(){
-  const group=new THREE.Group(),shadow=ellipse(.82,.28,flat(0x000000,.48),36),halo=ellipse(.92,.68,flat(0xe3a64d,.11,{blending:THREE.AdditiveBlending}),48),ring=ellipseLoop(.88,.64,0xe4bd6a,.58,56),rays=new THREE.Group(),texture=atlasTexture('/assets/open-reliquary.png'),material=new THREE.MeshBasicMaterial({map:texture,color:0xffffff,transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}),sprite=plane(1.72,1.57,material),pickTarget=plane(2.15,1.86,new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
-  shadow.position.set(0,-.49,-.18);halo.position.set(0,-.02,.08);ring.position.set(0,-.08,.14);sprite.position.set(0,.08,.48);pickTarget.position.set(0,.05,.82);for(let i=0;i<12;i+=1){const angle=i/12*Math.PI*2,length=i%3===0?.92:.66,ray=line([[Math.cos(angle)*.58,Math.sin(angle)*.42,0],[Math.cos(angle)*length,Math.sin(angle)*length*.72,0]],i%3===0?0xf2cc78:0xd78c3d,i%3===0?.62:.34);ray.position.z=.2;ray.userData={phase:i/12*Math.PI*2};rays.add(ray)}group.add(shadow,halo,rays,ring,sprite,pickTarget);group.userData={shadow,halo,ring,rays,sprite,pickTarget,baseY:0};return group;
+  const group=new THREE.Group(),shadow=ellipse(.46,.13,flat(0x000000,.26),32),sprite=rigidAtlasPlane('/assets/reliquary-shine-atlas.png',2,2),pickTarget=plane(1.55,1.2,new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
+  shadow.position.set(0,-.34,-.12);sprite.scale.set(1.7,1.275,1);sprite.position.set(0,.02,.42);pickTarget.position.set(0,.02,.76);group.add(shadow,sprite,pickTarget);group.userData={shadow,sprite,pickTarget};return group;
 }
 
 export function updateTreasureVisual(treasure,time=0){
-  const group=treasure?.mesh;if(!group?.userData?.sprite)return;const state=group.userData,pulse=(Math.sin(time*.0048+treasure.id)+1)/2,claimed=treasure.state==='claimed',hovered=treasure.hovered;group.position.set(treasure.x,treasure.y,.3);group.scale.setScalar((hovered?1.12:claimed?1.04:1)*(1+pulse*.018));state.sprite.position.y=.08+Math.sin(time*.0028+treasure.id)*.025;state.sprite.material.color.set(hovered?0xfff0c2:claimed?0xffd38a:0xffffff);state.halo.material.opacity=(hovered?.25:claimed?.17:.09)+pulse*.12;state.halo.scale.setScalar(.92+pulse*.22);state.ring.material.opacity=(hovered?.86:claimed?.64:.42)+pulse*.22;state.ring.rotation.z+=claimed?.018:.009;state.rays.rotation.z+=claimed?.008:.0035;state.rays.children.forEach((ray,index)=>{ray.material.opacity=(hovered?.6:.3)+Math.sin(time*.006+ray.userData.phase+index)*.2});
+  const group=treasure?.mesh;if(!group?.userData?.sprite)return;const state=group.userData,sequence=[0,1,2,3,2,1],frame=sequence[Math.floor(time*.0032+treasure.id*.83)%sequence.length];group.position.set(treasure.x,treasure.y,.3);group.scale.setScalar(1);state.sprite.userData.setAnimationFrame(frame);state.sprite.position.x=frame%2===0?-.07:.07;state.sprite.material.uniforms.uTint.value.set(treasure.hovered?0xffe8c2:treasure.state==='claimed'?0xffd7a0:0xffffff);state.shadow.material.opacity=treasure.hovered?.34:.24;
 }
 
 export function disposeTreasureVisual(group){
