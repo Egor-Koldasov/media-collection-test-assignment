@@ -9,7 +9,7 @@ const rolePreferences={
   artillery:['Ranged','Zones','Affliction','Posture','Propagation'],
   skirmisher:['Motion','Melee','Harvest','Order','Desperation']
 };
-const runCount=Math.max(1,Number(process.argv[2])||10),results=[];
+const runCount=Math.max(1,Number(process.argv[2])||10),difficulty=Math.min(5,Math.max(1,Number(process.argv[3])||4)),results=[];
 
 for(let run=0;run<runCount;run+=1){
   let game,ended=null;
@@ -29,7 +29,7 @@ for(let run=0;run<runCount;run+=1){
       game.resumeAfterUpgrade();
     },
     onEnd:(result)=>{ended=result}
-  },{headless:true});
+  },{headless:true,difficulty});
 
   game.start();let steps=0,peakEnemies=0;
   while(!game.ended&&steps<25000){game.update(.05);steps+=1;peakEnemies=Math.max(peakEnemies,game.enemies.length)}
@@ -45,6 +45,7 @@ for(let run=0;run<runCount;run+=1){
 const elapsed=results.map((run)=>run.elapsed).sort((a,b)=>a-b);
 const report={
   summary:{
+    difficulty,
     wins:results.filter((run)=>run.victory).length,total:results.length,
     medianSeconds:elapsed[Math.floor(elapsed.length/2)],minimumSeconds:elapsed[0],maximumSeconds:elapsed.at(-1),
     averageKills:Math.round(results.reduce((sum,run)=>sum+run.kills,0)/results.length)

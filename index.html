@@ -64,6 +64,12 @@
           <h2>The dead have nineteen minutes.<br /><em>You have twenty.</em></h2>
           <p class="intro-copy">One nameless oathbound will answer the first bell. Others arrive by fate alone. They fight by a fixed litany of abilities—your only mercy is choosing what they become.</p>
           <div class="rules-ribbon"><div><strong>20:00</strong><span>Survive the full rite</span></div><div><strong>AP</strong><span>Every act has a price</span></div><div><strong>∞</strong><span>The skeleton tide grows</span></div></div>
+          <section class="difficulty-control" aria-labelledby="difficulty-heading">
+            <div class="difficulty-heading"><span id="difficulty-heading">GRAVE PRESSURE</span><strong><i id="difficulty-roman">IV</i> <b id="difficulty-name">DREAD</b></strong></div>
+            <input id="difficulty-slider" type="range" min="1" max="5" step="1" value="4" aria-describedby="difficulty-detail" />
+            <div class="difficulty-scale" aria-hidden="true"><span>MOURNFUL</span><span>WATCHFUL</span><span>GRIM</span><span>DREAD</span><span>RUIN</span></div>
+            <p id="difficulty-detail">The default rite. Stronger dead arrive more quickly.</p>
+          </section>
           <div><p class="law-heading">TONIGHT THE GRAVE OBSERVES TWO LAWS</p><div id="intro-laws" class="intro-laws"></div><p id="intro-law-record" class="intro-law-record"></p></div>
           <button id="start-button" class="primary-button" type="button"><span>Strike the first bell</span><i>→</i></button>
           <p class="fine-print">Your company acts without orders. The sequence is law.</p>

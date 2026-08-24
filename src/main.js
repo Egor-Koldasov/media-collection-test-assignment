@@ -18,10 +18,7 @@ const pausedSeal = $('#paused-seal');
 const archive = $('#grave-archive');
 const encounterBanner = $('#encounter-banner');
 let latestSnapshot = null;
-let pendingUpgrade = null;
-let pendingUpgradeChoices = [];
 let upgradeUnitId = null;
-let upgradeInspectUnitId = null;
 let orderEditorOpen = false;
 let archivePreviousModalPause = false;
 let encounterTimer = 0;
@@ -205,27 +202,18 @@ function decisionAbilityMarkup(unit,ability,index){
 
 function renderUpgradeCompanyReadout(snapshot){
   const readout=$('#upgrade-company-readout');if(!readout)return;const living=snapshot.units.filter((unit)=>unit.alive);if(!living.length)return;
-  const inspected=living.find((unit)=>unit.id===upgradeInspectUnitId)||living.find((unit)=>unit.id===snapshot.selectedId)||living[0];upgradeInspectUnitId=inspected.id;
-  readout.innerHTML=`<div class="upgrade-readout-heading"><span>COMPANY LEDGER</span><strong>Inspect the possible bearer</strong></div><div class="upgrade-unit-tabs">${living.map((unit)=>`<button type="button" class="upgrade-unit-tab ${unit.id===inspected.id?'is-active':''}" data-inspect-upgrade-unit="${unit.id}"><span class="choice-portrait-mini" style="--portrait-position:${unit.portrait*25}%"></span><span><strong>${unit.name}</strong><small>${unit.archetype} · ${unit.abilities.length} ${unit.abilities.length===1?'RITE':'RITES'}</small></span></button>`).join('')}</div><div class="upgrade-ability-ledger"><div class="upgrade-bearer-meta"><span>${inspected.originSigil} ${inspected.origin}</span><small>${Math.ceil(inspected.hp)}/${Math.ceil(inspected.maxHp)} HEALTH · ${Math.floor(inspected.ap)}/${Math.floor(inspected.maxAp)} AP</small></div>${inspected.abilities.map((ability,index)=>decisionAbilityMarkup(inspected,ability,index)).join('')}</div>`;
-  readout.querySelectorAll('[data-inspect-upgrade-unit]').forEach((button)=>button.addEventListener('click',()=>{upgradeInspectUnitId=Number(button.dataset.inspectUpgradeUnit);renderUpgradeCompanyReadout(snapshot)}));
+  const selected=living.find((unit)=>unit.id===upgradeUnitId)||living.find((unit)=>unit.id===snapshot.selectedId)||living[0];upgradeUnitId=selected.id;
+  readout.innerHTML=`<div class="upgrade-readout-heading"><span>SELECTED BEARER</span><strong>${selected.name}</strong><p>Choosing another oathbound below both inspects and selects them.</p></div><div class="upgrade-unit-tabs">${living.map((unit)=>`<button type="button" class="upgrade-unit-tab ${unit.id===selected.id?'is-active':''}" data-select-upgrade-unit="${unit.id}" aria-pressed="${unit.id===selected.id}"><span class="choice-portrait-mini" style="--portrait-position:${unit.portrait*25}%"></span><span><strong>${unit.name}</strong><small>${unit.archetype} · ${unit.abilities.length} ${unit.abilities.length===1?'RITE':'RITES'}</small></span><i>${unit.id===selected.id?'SELECTED':'SELECT'}</i></button>`).join('')}</div><div class="upgrade-ability-ledger"><div class="upgrade-bearer-meta"><span>${selected.originSigil} ${selected.origin}</span><small>${Math.ceil(selected.hp)}/${Math.ceil(selected.maxHp)} HEALTH · ${Math.floor(selected.ap)}/${Math.floor(selected.maxAp)} AP</small></div>${selected.abilities.map((ability,index)=>decisionAbilityMarkup(selected,ability,index)).join('')}</div>`;
+  modalContent.querySelectorAll('[data-upgrade-bearer]').forEach((label)=>label.textContent=selected.name);readout.querySelectorAll('[data-select-upgrade-unit]').forEach((button)=>button.addEventListener('click',()=>{upgradeUnitId=Number(button.dataset.selectUpgradeUnit);game.selectUnit(upgradeUnitId);renderUpgradeCompanyReadout(snapshot)}));
 }
 
 function renderUpgradeChoices(choices,snapshot) {
-  latestSnapshot=snapshot;pendingUpgrade=null;pendingUpgradeChoices=choices;orderEditorOpen=false;modalBackdrop.classList.remove('concept-backdrop');
+  latestSnapshot=snapshot;upgradeUnitId=snapshot.units.find((unit)=>unit.id===snapshot.selectedId&&unit.alive)?.id||snapshot.units.find((unit)=>unit.alive)?.id||null;orderEditorOpen=false;modalBackdrop.classList.remove('concept-backdrop');
   modalContent.className='modal-content choice-view';
-  modalContent.innerHTML=`<p class="chapter">BELL ${roman(snapshot.bell)} · THE BLOOD BOOK OPENS</p><h2>Choose one truth to make real.</h2><p>Inspect every current litany, then choose the rite and its bearer. Binding rekindles some health, ward, and AP.</p><div class="upgrade-decision-layout"><aside id="upgrade-company-readout" class="upgrade-company-readout"></aside><div class="upgrade-grid">${choices.map((upgrade,index)=>`<button class="upgrade-card tier-${upgrade.rarity} inflection-${upgrade.inflectionId}" type="button" data-upgrade="${index}" data-rune="${upgrade.rune}"><span class="card-top"><span>${upgrade.family} · ${upgrade.inflectionLabel}</span><span class="rarity-pips">${'◆'.repeat(upgrade.rarity)}${'◇'.repeat(4-upgrade.rarity)}</span></span><span class="${upgradeArtClass(upgrade)}" style="${upgradeArtStyle(upgrade)}" role="img" aria-label="Illustration for ${upgrade.shortName}"><i>${upgrade.sigil}</i><b>${upgrade.rune}</b></span><h3>${upgrade.name}</h3><p>${upgrade.description}</p><footer>Bind this rite <span>→</span></footer></button>`).join('')}</div></div>`;
+  modalContent.innerHTML=`<p class="chapter">BELL ${roman(snapshot.bell)} · RELIQUARY CLAIMED</p><h2>Choose one truth to make real.</h2><p>The selected oathbound at left receives whichever rite you choose. Select another to inspect and change the bearer.</p><div class="upgrade-decision-layout"><aside id="upgrade-company-readout" class="upgrade-company-readout"></aside><div class="upgrade-grid">${choices.map((upgrade,index)=>`<button class="upgrade-card tier-${upgrade.rarity} inflection-${upgrade.inflectionId}" type="button" data-upgrade="${index}" data-rune="${upgrade.rune}"><span class="card-top"><span>${upgrade.family} · ${upgrade.inflectionLabel}</span><span class="rarity-pips">${'◆'.repeat(upgrade.rarity)}${'◇'.repeat(4-upgrade.rarity)}</span></span><span class="${upgradeArtClass(upgrade)}" style="${upgradeArtStyle(upgrade)}" role="img" aria-label="Illustration for ${upgrade.shortName}"><i>${upgrade.sigil}</i><b>${upgrade.rune}</b></span><h3>${upgrade.name}</h3><p>${upgrade.description}</p><footer>Bind to <b data-upgrade-bearer></b> <span>→</span></footer></button>`).join('')}</div></div>`;
   renderUpgradeCompanyReadout(snapshot);
-  modalContent.querySelectorAll('[data-upgrade]').forEach((button)=>button.addEventListener('click',()=>{pendingUpgrade=choices[Number(button.dataset.upgrade)];renderUnitChoice(snapshot)}));
+  modalContent.querySelectorAll('[data-upgrade]').forEach((button)=>button.addEventListener('click',()=>{const upgrade=choices[Number(button.dataset.upgrade)],unit=game.applyUpgrade(upgrade,upgradeUnitId);if(!unit)return;hideModal();game.resumeAfterUpgrade()}));
   showModal();
-}
-
-function renderUnitChoice(snapshot) {
-  const living=snapshot.units.filter((unit)=>unit.alive);
-  modalContent.innerHTML=`<button id="choose-another-upgrade" class="modal-back-button" type="button">← CHOOSE ANOTHER RITE</button><p class="chapter">${pendingUpgrade.family} · ${'◆'.repeat(pendingUpgrade.rarity)}</p><h2>Who bears “${pendingUpgrade.shortName}”?</h2><p>Every current ability is written below. The rite binds immediately; order may be rewritten from the folio whenever you wish.</p><div class="unit-choice-grid">${living.map((unit)=>`<button class="unit-choice" type="button" data-bind-unit="${unit.id}"><div class="choice-portrait" style="--portrait-position:${unit.portrait*25}%"></div><strong>${unit.name}</strong><span>${unit.archetype} · rank ${unit.level}</span><span class="choice-stats">${unit.originSigil} ${unit.origin}<br>${unit.aiState}<br>${Math.ceil(unit.hp)}/${Math.ceil(unit.maxHp)} health · ${Math.floor(unit.ap)}/${Math.floor(unit.maxAp)} AP</span><span class="unit-choice-abilities">${unit.abilities.map((ability,index)=>decisionAbilityMarkup(unit,ability,index)).join('')}</span>${unit.traits.length?`<span class="choice-traits"><em>${unit.traits.slice(-2).join(' · ')}</em></span>`:''}</button>`).join('')}</div>`;
-  $('#choose-another-upgrade').addEventListener('click',()=>renderUpgradeChoices(pendingUpgradeChoices,snapshot));
-  modalContent.querySelectorAll('[data-bind-unit]').forEach((button)=>button.addEventListener('click',()=>{
-    upgradeUnitId=Number(button.dataset.bindUnit);game.applyUpgrade(pendingUpgrade,upgradeUnitId);pendingUpgrade=null;hideModal();game.resumeAfterUpgrade();
-  }));
 }
 
 function renderOrderChoice(unit) {
@@ -257,7 +245,10 @@ const game=new Game(stage,{
   onEnd:renderOutcome
 });
 
-$('#start-button').addEventListener('click',()=>game.start());
+const difficultySlider=$('#difficulty-slider');
+function renderDifficulty(){const preset=game.setDifficulty(Number(difficultySlider.value));$('#difficulty-roman').textContent=preset.roman;$('#difficulty-name').textContent=preset.name.toUpperCase();$('#difficulty-detail').textContent=preset.detail;difficultySlider.setAttribute('aria-valuetext',`${preset.name}, level ${preset.level} of 5`)}
+difficultySlider.addEventListener('input',renderDifficulty);renderDifficulty();
+$('#start-button').addEventListener('click',()=>{game.setDifficulty(Number(difficultySlider.value));game.start()});
 $('#archive-button').addEventListener('click',openArchive);
 $('#archive-close').addEventListener('click',closeArchive);
 archive.querySelector('.archive-scrim').addEventListener('click',closeArchive);

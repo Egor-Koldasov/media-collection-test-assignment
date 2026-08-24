@@ -240,6 +240,19 @@ export function createSkeletonVisual(enemy){
   group.userData={hp,ap,statusRing,shieldRing,eliteRing,crown,body,sprite,phase:Math.random()*8,baseOpacity:enemy.template.phase?.72:1};return group;
 }
 
+export function createTreasureVisual(){
+  const group=new THREE.Group(),shadow=ellipse(.82,.28,flat(0x000000,.48),36),halo=ellipse(.92,.68,flat(0xe3a64d,.11,{blending:THREE.AdditiveBlending}),48),ring=ellipseLoop(.88,.64,0xe4bd6a,.58,56),rays=new THREE.Group(),texture=atlasTexture('/assets/open-reliquary.png'),material=new THREE.MeshBasicMaterial({map:texture,color:0xffffff,transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}),sprite=plane(1.72,1.57,material),pickTarget=plane(2.15,1.86,new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
+  shadow.position.set(0,-.49,-.18);halo.position.set(0,-.02,.08);ring.position.set(0,-.08,.14);sprite.position.set(0,.08,.48);pickTarget.position.set(0,.05,.82);for(let i=0;i<12;i+=1){const angle=i/12*Math.PI*2,length=i%3===0?.92:.66,ray=line([[Math.cos(angle)*.58,Math.sin(angle)*.42,0],[Math.cos(angle)*length,Math.sin(angle)*length*.72,0]],i%3===0?0xf2cc78:0xd78c3d,i%3===0?.62:.34);ray.position.z=.2;ray.userData={phase:i/12*Math.PI*2};rays.add(ray)}group.add(shadow,halo,rays,ring,sprite,pickTarget);group.userData={shadow,halo,ring,rays,sprite,pickTarget,baseY:0};return group;
+}
+
+export function updateTreasureVisual(treasure,time=0){
+  const group=treasure?.mesh;if(!group?.userData?.sprite)return;const state=group.userData,pulse=(Math.sin(time*.0048+treasure.id)+1)/2,claimed=treasure.state==='claimed',hovered=treasure.hovered;group.position.set(treasure.x,treasure.y,.3);group.scale.setScalar((hovered?1.12:claimed?1.04:1)*(1+pulse*.018));state.sprite.position.y=.08+Math.sin(time*.0028+treasure.id)*.025;state.sprite.material.color.set(hovered?0xfff0c2:claimed?0xffd38a:0xffffff);state.halo.material.opacity=(hovered?.25:claimed?.17:.09)+pulse*.12;state.halo.scale.setScalar(.92+pulse*.22);state.ring.material.opacity=(hovered?.86:claimed?.64:.42)+pulse*.22;state.ring.rotation.z+=claimed?.018:.009;state.rays.rotation.z+=claimed?.008:.0035;state.rays.children.forEach((ray,index)=>{ray.material.opacity=(hovered?.6:.3)+Math.sin(time*.006+ray.userData.phase+index)*.2});
+}
+
+export function disposeTreasureVisual(group){
+  group?.traverse?.((child)=>{child.geometry?.dispose?.();if(child.material){const materials=Array.isArray(child.material)?child.material:[child.material];materials.forEach((material)=>material.dispose?.())}});
+}
+
 export function updateEntityVisual(entity,selected=false,time=0){
   if(!entity.mesh)return;entity.mesh.position.set(entity.x,entity.y,entity.kind==='hero'?.12:.08);const ratio=Math.max(0,entity.hp/entity.maxHp);const hpBar=entity.mesh.userData.hp;if(hpBar){hpBar.userData.fill.scale.x=ratio;hpBar.userData.fill.position.x=-(hpBar.userData.width*(1-ratio))/2}
   const speed=Math.hypot(entity.vx||0,entity.vy||0),motion=Math.min(1,speed/1.6),facing=(entity.vx||0)<-.04?-1:1,sprite=entity.mesh.userData.sprite,spriteUniforms=sprite?.userData?.spriteUniforms,phase=entity.visualPhase??entity.mesh.userData.phase??0,cadence=time*(entity.kind==='hero'?.0092:.0076)+phase,stride=Math.sin(cadence*Math.PI/2),previousVx=entity.mesh.userData.previousVx??entity.vx??0,acceleration=(entity.vx||0)-previousVx;entity.mesh.userData.previousVx=entity.vx||0;const lean=Math.max(-1,Math.min(1,(entity.vx||0)*.28+acceleration*1.7));
