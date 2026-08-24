@@ -65,7 +65,7 @@ export class Game {
     applyGraveLawsToHero(this.graveLaws,unit);
     unit.shield+=unit.maxHp*(initial?.18:.12);
     unit.mesh=createHeroVisual(unit);this.scene.add(unit.mesh);this.units.push(unit);if(!this.selectedId)this.selectedId=unit.id;const newOrigin=discoverOrigin(this.chronicle,unit.originId);this.events.onRoster?.(this.snapshot());if(newOrigin)this.events.onDiscovery?.(this.snapshot());
-    if(!initial){this.audio.bell(this.units.length);this.feed(`<strong>${unit.name}</strong>, ${unit.archetype}, arrives unbidden.`,true);this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd5a25c,18,1.4));this.effects.push(createBurst(this.scene,unit.x,unit.y,0xd5a25c,1.2))}
+    if(!initial){this.audio.bell(this.units.length);this.feed(`<strong>${unit.name}</strong>, ${unit.archetype}, arrives unbidden.`,true);this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd5a25c,18,1.4,'ritual'));this.effects.push(createBurst(this.scene,unit.x,unit.y,0xd5a25c,1.2,'ritual'))}
     return unit;
   }
 
@@ -144,8 +144,8 @@ export class Game {
 
     if(ability.kind==='heal'||ability.kind==='ward'||ability.kind==='transfusion'){
       const ally=chooseSupportTarget(unit,allies);if(!ally||distance(unit,ally)>abilityTacticalRange(unit,ability))return false;
-      if(ability.kind==='heal'){this.heal(ally,ability.power*unit.mods.healing*powerScale,true);this.effects.push(createParticleBurst(this.scene,ally.x,ally.y,ability.color,10,.75))}
-      if(ability.kind==='ward'){const amount=ability.power*unit.mods.ward*powerScale;ally.shield+=amount;this.effects.push(createBurst(this.scene,ally.x,ally.y,ability.color,.7));this.effects.push(createFloatingText(this.scene,`+${Math.round(amount)} WARD`,ally.x,ally.y,'#8f9bcc'));this.audio.ward()}
+      if(ability.kind==='heal'){this.heal(ally,ability.power*unit.mods.healing*powerScale,true);this.effects.push(createParticleBurst(this.scene,ally.x,ally.y,ability.color,10,.75,'heal'))}
+      if(ability.kind==='ward'){const amount=ability.power*unit.mods.ward*powerScale;ally.shield+=amount;this.effects.push(createBurst(this.scene,ally.x,ally.y,ability.color,.7,'heal'));this.effects.push(createFloatingText(this.scene,`+${Math.round(amount)} WARD`,ally.x,ally.y,'#8f9bcc'));this.audio.ward()}
       if(ability.kind==='transfusion'){const payment=Math.min(unit.hp-1,Math.max(3,unit.maxHp*.055));unit.hp-=Math.max(0,payment);this.heal(ally,ability.power*unit.mods.healing*powerScale+payment*.8,true);ally.status.haste=Math.max(ally.status.haste||0,2.8);this.effects.push(createBeam(this.scene,unit,ally,ability.color,.4))}
       unit.mods.afterSupportReady=true;return true;
     }
@@ -161,7 +161,7 @@ export class Game {
       const critical=Math.random()<unit.mods.critChance;if(critical)multiplier*=unit.mods.critPower;const amount=ability.power*multiplier;this.damageEnemy(victim,amount,unit,critical,flags);
       if(unit.mods.slow>0){victim.status.slow=Math.max(victim.status.slow,1.2*unit.mods.statusPower);victim.status.slowPower=Math.min(.65,unit.mods.slow)}
       if(ability.kind==='burn'){victim.status.burn=3.2*unit.mods.statusPower;victim.status.burnDps=Math.max(victim.status.burnDps,amount*.18*unit.mods.statusPower);victim.status.burnSourceId=unit.id}
-      if(ability.kind==='frost'){if(victim.status.brittle>0)this.effects.push(createParticleBurst(this.scene,victim.x,victim.y,0xaec9dd,15,1));victim.status.slow=2.3*unit.mods.statusPower;victim.status.slowPower=Math.max(victim.status.slowPower||0,.4);victim.status.brittle=4.5*unit.mods.statusPower}
+      if(ability.kind==='frost'){if(victim.status.brittle>0)this.effects.push(createParticleBurst(this.scene,victim.x,victim.y,0xaec9dd,15,1,'shockwave'));victim.status.slow=2.3*unit.mods.statusPower;victim.status.slowPower=Math.max(victim.status.slowPower||0,.4);victim.status.brittle=4.5*unit.mods.statusPower}
       if(ability.kind==='curse'){victim.status.curse=8*unit.mods.statusPower;victim.status.cursePower=amount*.85;victim.status.curseSourceId=unit.id}
       if(critical&&unit.mods.critBleed>0){victim.status.bleed=Math.max(victim.status.bleed,3);victim.status.bleedDps=Math.max(victim.status.bleedDps,amount*unit.mods.critBleed/3);victim.status.bleedSourceId=unit.id}
       if(ability.kind==='strike')victim.status.armorBreak=Math.max(victim.status.armorBreak,4.5);
@@ -207,7 +207,7 @@ export class Game {
   updateDeferred(dt){
     for(const action of this.deferred){action.timer-=dt;action.telegraph?.update?.(dt,action)}
     const ready=this.deferred.filter((action)=>action.timer<=0);this.deferred=this.deferred.filter((action)=>action.timer>0);
-    ready.forEach((action)=>{const unit=this.units.find((item)=>item.id===action.unitId&&item.alive);if(action.type==='echo'&&unit)this.cast(unit,action.ability,action.slot,action.power,true);if(action.type==='blast'){action.telegraph?.destroy?.();this.enemies.filter((enemy)=>enemy.alive&&distance(enemy,action)<=action.radius).forEach((enemy)=>this.damageEnemy(enemy,action.power,unit,Math.random()<.08));this.effects.push(createParticleBurst(this.scene,action.x,action.y,action.color,28,action.radius));this.effects.push(createBurst(this.scene,action.x,action.y,action.color,action.radius/2));this.cameraShake=Math.max(this.cameraShake,.22);this.audio.bell(3)}});
+    ready.forEach((action)=>{const unit=this.units.find((item)=>item.id===action.unitId&&item.alive);if(action.type==='echo'&&unit)this.cast(unit,action.ability,action.slot,action.power,true);if(action.type==='blast'){action.telegraph?.destroy?.();this.enemies.filter((enemy)=>enemy.alive&&distance(enemy,action)<=action.radius).forEach((enemy)=>this.damageEnemy(enemy,action.power,unit,Math.random()<.08));this.effects.push(createParticleBurst(this.scene,action.x,action.y,action.color,28,action.radius,'shockwave'));this.effects.push(createBurst(this.scene,action.x,action.y,action.color,action.radius/2,'shockwave'));this.cameraShake=Math.max(this.cameraShake,.22);this.audio.bell(3)}});
   }
 
   updateOrbit(unit,dt,enemies){
@@ -228,7 +228,7 @@ export class Game {
     if(!enemy.alive)return;enemy.alive=false;enemy.intentEffect?.cancel?.();enemy.intentEffect=null;if(source){source.kills+=1;source.ap=Math.min(source.maxAp,source.ap+source.mods.killAp);this.heal(source,source.mods.killHeal,false)}this.killCount+=enemy.template.score*(1+enemy.affixes.length);
     const tithe=lawSum(this.graveLaws,'run','onKillHeal');if(tithe>0){const weakest=this.units.filter((unit)=>unit.alive).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(weakest)this.heal(weakest,weakest.maxHp*tithe,false)}
     if(source?.mods?.plagueSpread>0&&(enemy.status.burn>0||enemy.status.bleed>0||enemy.status.brittle>0)){const spread=source.mods.plagueSpread;this.enemies.filter((other)=>other.alive&&other!==enemy&&distance(enemy,other)<2.4).forEach((other)=>{if(enemy.status.burn>0){other.status.burn=Math.max(other.status.burn,enemy.status.burn*.55);other.status.burnDps=Math.max(other.status.burnDps,enemy.status.burnDps*spread);other.status.burnSourceId=source.id}if(enemy.status.bleed>0){other.status.bleed=Math.max(other.status.bleed,enemy.status.bleed*.55);other.status.bleedDps=Math.max(other.status.bleedDps,enemy.status.bleedDps*spread);other.status.bleedSourceId=source.id}if(enemy.status.brittle>0)other.status.brittle=Math.max(other.status.brittle,enemy.status.brittle*.55)});this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0x8c775f,11,1.25))}
-    if(enemy.status.curse>0){const curseSource=this.units.find((unit)=>unit.id===enemy.status.curseSourceId&&unit.alive)||source;this.enemies.filter((other)=>other.alive&&other!==enemy&&distance(enemy,other)<2.3).forEach((other)=>{this.damageEnemy(other,enemy.status.cursePower,curseSource,false);other.status.curse=Math.max(other.status.curse,4);other.status.cursePower=enemy.status.cursePower*.65;other.status.curseSourceId=curseSource?.id});this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0x9a66a7,16,1.7))}
+    if(enemy.status.curse>0){const curseSource=this.units.find((unit)=>unit.id===enemy.status.curseSourceId&&unit.alive)||source;this.enemies.filter((other)=>other.alive&&other!==enemy&&distance(enemy,other)<2.3).forEach((other)=>{this.damageEnemy(other,enemy.status.cursePower,curseSource,false);other.status.curse=Math.max(other.status.curse,4);other.status.cursePower=enemy.status.cursePower*.65;other.status.curseSourceId=curseSource?.id});this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0x9a66a7,16,1.7,'curse'))}
     if(enemy.deathBurst>0){const blast=enemy.maxHp*enemy.deathBurst;this.units.filter((unit)=>unit.alive&&distance(enemy,unit)<2.75).forEach((unit)=>this.damageHero(unit,blast,enemy));this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,enemy.affixColor,26,2.25));this.effects.push(createBurst(this.scene,enemy.x,enemy.y,enemy.affixColor,2));this.cameraShake=Math.max(this.cameraShake,.18)}
     if(enemy.template.splits){for(let i=0;i<enemy.template.splits;i+=1){const angle=i/enemy.template.splits*Math.PI*2;this.spawnEnemy('thrall',{x:enemy.x+Math.cos(angle)*.45,y:enemy.y+Math.sin(angle)*.45},[])}}
     if(enemy.elite)this.feed(`<strong>${enemy.name}</strong> is broken.`,true);
@@ -260,8 +260,8 @@ export class Game {
   enemySupportCast(enemy){
     enemy.ap-=enemy.attackCost;enemy.auraTimer=4.2+Math.random()*1.2;
     const nearby=this.enemies.filter((other)=>other.alive&&distance(enemy,other)<4);
-    if(enemy.template.bishop){nearby.sort((a,b)=>a.shield-b.shield).slice(0,3).forEach((other)=>other.shield+=other.maxHp*.13);this.effects.push(createBurst(this.scene,enemy.x,enemy.y,0x9d72b2,1.8))}
-    else {nearby.forEach((other)=>other.hp=Math.min(other.maxHp,other.hp+other.maxHp*.075));this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0x9d5cad,12,1.4))}
+    if(enemy.template.bishop){nearby.sort((a,b)=>a.shield-b.shield).slice(0,3).forEach((other)=>other.shield+=other.maxHp*.13);this.effects.push(createBurst(this.scene,enemy.x,enemy.y,0x9d72b2,1.8,'heal'))}
+    else {nearby.forEach((other)=>other.hp=Math.min(other.maxHp,other.hp+other.maxHp*.075));this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0x9d5cad,12,1.4,'heal'))}
   }
 
   enemyAttack(enemy,target){
@@ -289,7 +289,7 @@ export class Game {
   cleanup(){this.enemies=this.enemies.filter((enemy)=>{if(enemy.alive)return true;this.scene.remove(enemy.mesh);enemy.mesh.traverse((child)=>{child.geometry?.dispose?.();if(child.material){if(Array.isArray(child.material))child.material.forEach((material)=>material.dispose());else child.material.dispose()}});return false})}
 
   openUpgrade(){this.modalPaused=true;const minimum=this.elapsed>900?1:0;const choices=getUpgradeChoices(3,minimum);this.events.onUpgrade?.(choices,this.snapshot());this.feed('A page tears itself from the Blood Book.',true)}
-  applyUpgrade(upgrade,unitId){const unit=this.units.find((item)=>item.id===unitId&&item.alive);if(!unit)return null;upgrade.apply(unit);unit.hp=Math.min(unit.maxHp,unit.hp+unit.maxHp*.1);unit.shield+=unit.maxHp*.04;unit.ap=Math.min(unit.maxAp,unit.ap+unit.maxAp*.25);this.appliedUpgradeIds.add(upgrade.id);discoverRite(this.chronicle,upgrade.id);this.selectedId=unit.id;this.audio.bell(upgrade.rarity+2);this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd6504f,20,1.5));this.feed(`<strong>${unit.name}</strong> receives ${upgrade.shortName}; the binding rekindles flesh, ward, and will.`,true);const snapshot=this.snapshot();this.events.onRoster?.(snapshot);this.events.onHud?.(snapshot);this.events.onDiscovery?.(snapshot);return unit}
+  applyUpgrade(upgrade,unitId){const unit=this.units.find((item)=>item.id===unitId&&item.alive);if(!unit)return null;upgrade.apply(unit);unit.hp=Math.min(unit.maxHp,unit.hp+unit.maxHp*.1);unit.shield+=unit.maxHp*.04;unit.ap=Math.min(unit.maxAp,unit.ap+unit.maxAp*.25);this.appliedUpgradeIds.add(upgrade.id);discoverRite(this.chronicle,upgrade.id);this.selectedId=unit.id;this.audio.bell(upgrade.rarity+2);this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd6504f,20,1.5,'ritual'));this.feed(`<strong>${unit.name}</strong> receives ${upgrade.shortName}; the binding rekindles flesh, ward, and will.`,true);const snapshot=this.snapshot();this.events.onRoster?.(snapshot);this.events.onHud?.(snapshot);this.events.onDiscovery?.(snapshot);return unit}
   reorderAbility(unitId,from,to){const unit=this.units.find((item)=>item.id===unitId);if(!unit||to<0||to>=unit.abilities.length)return;const [ability]=unit.abilities.splice(from,1);unit.abilities.splice(to,0,ability);unit.abilityCursor=0;this.events.onRoster?.(this.snapshot())}
   resumeAfterUpgrade(){this.modalPaused=false}
   feed(message,important=false){this.events.onFeed?.(message,important)}

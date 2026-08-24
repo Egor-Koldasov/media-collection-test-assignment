@@ -102,3 +102,38 @@ button{font:inherit} button:focus-visible{outline:2px solid var(--ember);outline
 .archive-enemy .archive-glyph.enemy-art{height:52px;background-color:#090a0d;background-image:url('/assets/undead-sprites.png');background-size:400% 300%;background-position:var(--art-x,0%) var(--art-y,0%);background-repeat:no-repeat;filter:saturate(.78) contrast(1.08);box-shadow:inset 0 0 9px #000}
 .archive-enemy{grid-template-columns:40px 1fr}.archive-enemy .archive-glyph{width:40px}.archive-enemy.is-discovered .archive-glyph.enemy-art{color:transparent}
 @media(max-width:680px){.order-row{grid-template-columns:28px 46px 1fr auto;gap:7px}.order-row .ability-icon{width:42px;height:42px}.mini-ability-art{width:27px;height:27px;flex-basis:27px}}
+
+/* The litany can finally explain itself, a luxury denied to everyone actually fighting. */
+.sequence-panel{position:relative;z-index:6}
+.ability-glyph{cursor:help;transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+.ability-glyph:hover,.ability-glyph:focus-visible{z-index:2;border-color:rgba(213,162,92,.72);box-shadow:0 0 0 1px rgba(213,162,92,.12),0 8px 20px rgba(0,0,0,.46);transform:translateY(-2px);outline:0}
+.ability-glyph:hover>.ability-art,.ability-glyph:focus-visible>.ability-art{filter:saturate(1.08) contrast(1.15);transform:scale(1.09)}
+.ability-inspector{position:absolute;z-index:12;right:0;bottom:calc(100% + 9px);width:100%;min-height:124px;padding:9px;display:grid;grid-template-columns:102px minmax(0,1fr);gap:11px;background:linear-gradient(135deg,rgba(23,21,22,.98),rgba(8,10,14,.99));border:1px solid rgba(213,162,92,.42);box-shadow:0 18px 42px rgba(0,0,0,.72),inset 0 0 32px rgba(158,45,51,.045);opacity:0;visibility:hidden;transform:translateY(7px) scale(.985);transform-origin:bottom right;pointer-events:none;transition:opacity .16s ease,transform .16s ease,visibility .16s}
+.ability-inspector::after{content:'';position:absolute;right:24px;bottom:-6px;width:10px;height:10px;background:#0c0d11;border-right:1px solid rgba(213,162,92,.42);border-bottom:1px solid rgba(213,162,92,.42);transform:rotate(45deg)}
+.ability-inspector.is-visible{opacity:1;visibility:visible;transform:translateY(0) scale(1)}
+.inspector-art{position:relative;min-height:104px;overflow:hidden;border:1px solid rgba(232,222,202,.18);background:#08090c;box-shadow:inset 0 0 18px #000}
+.ability-inspector-art{position:absolute;inset:0;display:block;background-image:url('/assets/ability-codex-atlas.png');background-size:600% 400%;background-position:var(--art-x,0%) var(--art-y,0%);background-repeat:no-repeat;filter:saturate(.9) contrast(1.12)}
+.inspector-art::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,rgba(5,6,8,.72),transparent 48%);box-shadow:inset 0 0 12px rgba(0,0,0,.55)}
+.inspector-art>span{position:absolute;z-index:1;left:6px;bottom:4px;color:var(--ember);font-family:var(--display);font-size:13px;text-shadow:0 1px 4px #000}
+.inspector-copy{min-width:0;padding-top:1px}.inspector-copy>small{display:block;color:var(--blood-bright);font-size:6px;letter-spacing:.16em}.inspector-copy h3{margin:4px 0 4px;font-family:var(--display);font-size:19px;line-height:1;font-weight:400;color:var(--bone)}
+.inspector-copy p{margin:0;color:var(--bone-dim);font-size:9px;line-height:1.25}.inspector-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:3px 6px;margin-top:8px;padding-top:6px;border-top:1px solid var(--line)}
+.inspector-stats span{color:var(--ash);font-size:5px;letter-spacing:.08em}.inspector-stats b{color:var(--ember);font-size:8px;font-weight:600}
+
+/* Forty-five painted mechanical families, then tier and inflection do the multiplying. */
+.upgrade-card{min-height:348px;padding:18px 18px 17px;--rite-accent:var(--ember);--rite-wash:rgba(213,162,92,.08)}
+.upgrade-card.inflection-ash{--rite-accent:#c8b796;--rite-wash:rgba(190,175,145,.12)}
+.upgrade-card.inflection-blood{--rite-accent:#d94a50;--rite-wash:rgba(182,45,53,.15)}
+.upgrade-card.inflection-moon{--rite-accent:#8e9cca;--rite-wash:rgba(83,95,145,.18)}
+.upgrade-card:hover{border-color:var(--rite-accent);box-shadow:0 16px 40px rgba(0,0,0,.45),inset 0 0 48px var(--rite-wash)}
+.upgrade-illustration{width:116px;height:116px;flex:0 0 116px;margin:15px auto 14px;position:relative;display:block;background-position:var(--art-x,0%) var(--art-y,0%);background-repeat:no-repeat;border:1px solid color-mix(in srgb,var(--rite-accent) 62%,#2b2928);box-shadow:0 9px 21px rgba(0,0,0,.48),inset 0 0 18px #000;filter:saturate(.78) contrast(1.08);transition:filter .22s ease,transform .22s ease,box-shadow .22s ease}
+.upgrade-atlas-a{background-image:url('/assets/upgrade-rites-a.png');background-size:500% 500%}.upgrade-atlas-b{background-image:url('/assets/upgrade-rites-b.png');background-size:500% 400%}
+.upgrade-illustration::before{content:'';position:absolute;inset:0;background:linear-gradient(145deg,transparent 42%,var(--rite-wash)),radial-gradient(circle at 50% 48%,transparent 48%,rgba(3,4,6,.52));mix-blend-mode:screen;pointer-events:none}
+.upgrade-illustration::after{content:'';position:absolute;inset:5px;border:1px solid color-mix(in srgb,var(--rite-accent) calc(18% + var(--rite-tier) * 8%),transparent);box-shadow:inset 0 0 calc(var(--rite-tier) * 4px) var(--rite-wash);pointer-events:none}
+.upgrade-illustration i,.upgrade-illustration b{position:absolute;z-index:2;display:grid;place-items:center;font-style:normal;font-weight:400;text-shadow:0 1px 5px #000;background:rgba(6,7,9,.78);backdrop-filter:blur(2px)}
+.upgrade-illustration i{left:6px;bottom:6px;width:27px;height:27px;border:1px solid var(--rite-accent);color:var(--rite-accent);font-family:var(--display);font-size:15px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.upgrade-illustration b{right:5px;top:5px;width:20px;height:20px;border:1px solid rgba(232,222,202,.3);color:var(--bone);font-size:10px}
+.upgrade-card:hover .upgrade-illustration{filter:saturate(1.02) contrast(1.13);transform:scale(1.035) rotate(-.6deg);box-shadow:0 12px 28px rgba(0,0,0,.58),0 0 calc(var(--rite-tier) * 5px) var(--rite-wash)}
+.upgrade-card.tier-3 .upgrade-illustration,.upgrade-card.tier-4 .upgrade-illustration{outline:1px solid color-mix(in srgb,var(--rite-accent) 22%,transparent);outline-offset:3px}
+.upgrade-card.tier-4 .upgrade-illustration{animation:sovereign-rite 3.2s ease-in-out infinite}@keyframes sovereign-rite{50%{box-shadow:0 9px 21px rgba(0,0,0,.48),0 0 18px var(--rite-wash),inset 0 0 18px #000}}
+.upgrade-card h3{font-size:23px}.upgrade-card p{font-size:12px;line-height:1.35}.upgrade-card footer{padding-top:13px}.rarity-pips{color:var(--rite-accent)}
+@media(max-width:680px){.ability-inspector{grid-template-columns:92px minmax(0,1fr)}.upgrade-card{min-height:320px}.upgrade-illustration{width:108px;height:108px;flex-basis:108px}}

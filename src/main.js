@@ -12,6 +12,7 @@ const modalBackdrop = $('#modal-backdrop');
 const modalContent = $('#modal-content');
 const roster = $('#roster');
 const sequence = $('#sequence');
+const abilityInspector = $('#ability-inspector');
 const feed = $('#combat-feed');
 const pausedSeal = $('#paused-seal');
 const archive = $('#grave-archive');
@@ -21,6 +22,8 @@ let pendingUpgrade = null;
 let upgradeUnitId = null;
 let archivePreviousModalPause = false;
 let encounterTimer = 0;
+let inspectedAbilityIndex = null;
+let inspectedUnitId = null;
 
 const abilityArtIndexes=new Map(ABILITY_TEMPLATES.map((ability,index)=>[ability.id,index]));
 const enemyArtIndexes=new Map(Object.keys(ENEMY_ARCHETYPES).map((id,index)=>[id,index]));
@@ -28,6 +31,8 @@ const atlasPosition=(index,columns,rows)=>{const column=index%columns,row=Math.f
 const abilityArtStyle=(ability)=>atlasPosition(ability.artIndex??abilityArtIndexes.get(ability.id)??0,6,4);
 const enemyArtStyle=(id)=>atlasPosition(enemyArtIndexes.get(id)??0,4,3);
 const abilityArt=(ability,className='ability-art')=>`<span class="${className}" style="${abilityArtStyle(ability)}" role="img" aria-label="${ability.name}"></span>`;
+const upgradeArtStyle=(upgrade)=>{const firstAtlas=upgrade.artIndex<25,localIndex=firstAtlas?upgrade.artIndex:upgrade.artIndex-25;return `${atlasPosition(localIndex,5,firstAtlas?5:4)};--rite-tier:${upgrade.rarity};--rite-inflection:${upgrade.inflectionIndex}`};
+const upgradeArtClass=(upgrade)=>`upgrade-illustration upgrade-atlas-${upgrade.artIndex<25?'a':'b'} inflection-${upgrade.inflectionId} tier-${upgrade.rarity}`;
 const enemyTactics={
   thrall:'A cheap rushing body.',hound:'Flanks isolated backliners.',pikeman:'Threatens through the front line.',bowman:'Retreats to maintain firing range.',harvester:'Sweeps several oathbound at once.',graveguard:'An armored anchor for the dead.',cantor:'Restores nearby graveborn.',standard:'Hastens the procession around it.',wraith:'Phases across unsafe ground.',bishop:'Wards the strongest nearby dead.',ossuary:'Breaks into fresh thralls.',giant:'A slow cleaving catastrophe.'
 };
@@ -125,10 +130,30 @@ function renderRoster(snapshot) {
 }
 
 function renderSequence(unit) {
-  if(!unit){sequence.innerHTML='<span class="fine-print">The litany is silent.</span>';return}
+  if(!unit){sequence.innerHTML='<span class="fine-print">The litany is silent.</span>';sequence.dataset.signature='';hideAbilityInspector();return}
   sequence.style.gridTemplateColumns=`repeat(${unit.abilities.length},1fr)`;
-  sequence.innerHTML=unit.abilities.map((ability,index)=>`<div class="ability-glyph ${index===unit.abilityCursor?'is-current':''}" title="${ability.name}: ${ability.detail}">${abilityArt(ability)}<span class="ability-shade"></span><span class="order">${roman(index+1)}</span><span class="category">${ability.category||ability.kind}</span><small>${Math.round(ability.cost*unit.mods.cost)} AP</small></div>`).join('');
+  const signature=`${unit.id}:${unit.abilities.map((ability)=>ability.id).join('|')}`;
+  if(sequence.dataset.signature!==signature){
+    sequence.dataset.signature=signature;
+    sequence.innerHTML=unit.abilities.map((ability,index)=>`<div class="ability-glyph" tabindex="0" data-ability-index="${index}" aria-label="Inspect ${ability.name}">${abilityArt(ability)}<span class="ability-shade"></span><span class="order">${roman(index+1)}</span><span class="category">${ability.category||ability.kind}</span><small></small></div>`).join('');
+    sequence.querySelectorAll('[data-ability-index]').forEach((glyph)=>{
+      const show=()=>{inspectedAbilityIndex=Number(glyph.dataset.abilityIndex);inspectedUnitId=unit.id;showAbilityInspector(unit,inspectedAbilityIndex)};
+      const hide=()=>{if(inspectedUnitId===unit.id&&inspectedAbilityIndex===Number(glyph.dataset.abilityIndex)){inspectedAbilityIndex=null;inspectedUnitId=null;hideAbilityInspector()}};
+      glyph.addEventListener('pointerenter',show);glyph.addEventListener('pointerleave',hide);glyph.addEventListener('focus',show);glyph.addEventListener('blur',hide);
+    });
+  }
+  sequence.querySelectorAll('[data-ability-index]').forEach((glyph)=>{const index=Number(glyph.dataset.abilityIndex),ability=unit.abilities[index];glyph.classList.toggle('is-current',index===unit.abilityCursor);glyph.querySelector('small').textContent=`${Math.round(ability.cost*unit.mods.cost)} AP`});
+  if(inspectedUnitId===unit.id&&inspectedAbilityIndex!==null)showAbilityInspector(unit,inspectedAbilityIndex);
 }
+
+function showAbilityInspector(unit,index){
+  const ability=unit?.abilities[index];if(!ability)return;
+  const category=(ability.category||ability.kind).toUpperCase(),cost=Math.round(ability.cost*unit.mods.cost),cooldown=(ability.cooldown*unit.mods.cooldown).toFixed(2),range=ability.range>0?(ability.range+unit.mods.range).toFixed(1):'SELF';
+  abilityInspector.innerHTML=`<div class="inspector-art">${abilityArt(ability,'ability-inspector-art')}<span>${roman(index+1)}</span></div><div class="inspector-copy"><small>${category} · NEXT IN THE LITANY</small><h3>${ability.name}</h3><p>${ability.detail}</p><div class="inspector-stats"><span><b>${cost}</b> AP</span><span><b>${Math.round(ability.power||0)}</b> POWER</span><span><b>${range}</b> REACH</span><span><b>${cooldown}s</b> RECOVERY</span></div></div>`;
+  abilityInspector.removeAttribute('aria-hidden');abilityInspector.classList.add('is-visible');
+}
+
+function hideAbilityInspector(){abilityInspector.classList.remove('is-visible');abilityInspector.setAttribute('aria-hidden','true')}
 
 function renderDossier(unit) {
   if(!unit)return;
@@ -151,6 +176,7 @@ function roman(number) {
 }
 
 function showModal() {
+  inspectedAbilityIndex=null;inspectedUnitId=null;hideAbilityInspector();
   shell.inert=true;
   modal.inert=false;
   modal.removeAttribute('aria-hidden');
@@ -168,7 +194,7 @@ function hideModal() {
 function renderUpgradeChoices(choices,snapshot) {
   latestSnapshot=snapshot;pendingUpgrade=null;modalBackdrop.classList.remove('concept-backdrop');
   modalContent.className='modal-content choice-view';
-  modalContent.innerHTML=`<p class="chapter">BELL ${roman(snapshot.bell)} · THE BLOOD BOOK OPENS</p><h2>Choose one truth to make real.</h2><p>Then name the oathbound who must carry it. Binding also rekindles some health, ward, and AP.</p><div class="upgrade-grid">${choices.map((upgrade,index)=>`<button class="upgrade-card" type="button" data-upgrade="${index}" data-rune="${upgrade.rune}"><span class="card-top"><span>${upgrade.family}</span><span class="rarity-pips">${'◆'.repeat(upgrade.rarity)}${'◇'.repeat(4-upgrade.rarity)}</span></span><span class="card-sigil"><span>${upgrade.sigil}</span></span><h3>${upgrade.name}</h3><p>${upgrade.description}</p><footer>Bind this rite <span>→</span></footer></button>`).join('')}</div>`;
+  modalContent.innerHTML=`<p class="chapter">BELL ${roman(snapshot.bell)} · THE BLOOD BOOK OPENS</p><h2>Choose one truth to make real.</h2><p>Then name the oathbound who must carry it. Binding also rekindles some health, ward, and AP.</p><div class="upgrade-grid">${choices.map((upgrade,index)=>`<button class="upgrade-card tier-${upgrade.rarity} inflection-${upgrade.inflectionId}" type="button" data-upgrade="${index}" data-rune="${upgrade.rune}"><span class="card-top"><span>${upgrade.family} · ${upgrade.inflectionLabel}</span><span class="rarity-pips">${'◆'.repeat(upgrade.rarity)}${'◇'.repeat(4-upgrade.rarity)}</span></span><span class="${upgradeArtClass(upgrade)}" style="${upgradeArtStyle(upgrade)}" role="img" aria-label="Illustration for ${upgrade.shortName}"><i>${upgrade.sigil}</i><b>${upgrade.rune}</b></span><h3>${upgrade.name}</h3><p>${upgrade.description}</p><footer>Bind this rite <span>→</span></footer></button>`).join('')}</div>`;
   modalContent.querySelectorAll('[data-upgrade]').forEach((button)=>button.addEventListener('click',()=>{pendingUpgrade=choices[Number(button.dataset.upgrade)];renderUnitChoice(snapshot)}));
   showModal();
 }

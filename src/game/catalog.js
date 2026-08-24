@@ -151,14 +151,20 @@ const blueprints = [
   { id:'circle-keeper', name:'The Circle Keeps Its Keeper', sigil:'⊚', family:'Zones', describe:p=>`Allies standing in this unit’s ritual zones accumulate barrier.`, apply:(u,p)=>u.mods.zoneWard+=.045*p }
 ];
 
-export const UPGRADE_CATALOG = blueprints.flatMap((blueprint) =>
-  tierPower.flatMap((power, tier) => inflections.map((inflection) => ({
+export const UPGRADE_CATALOG = blueprints.flatMap((blueprint, artIndex) =>
+  tierPower.flatMap((power, tier) => inflections.map((inflection, inflectionIndex) => ({
     id:`${blueprint.id}-${tier}-${inflection.id}`,
     name:`${tierNames[tier]} ${blueprint.name}`,
     shortName:blueprint.name,
     family:blueprint.family,
     sigil:blueprint.sigil,
     rune:inflection.glyph,
+    artIndex,
+    tier,
+    tierName:tierNames[tier],
+    inflectionId:inflection.id,
+    inflectionIndex,
+    inflectionLabel:inflection.label,
     rarity:tier + 1,
     description:`${blueprint.describe(power)} The ${inflection.label} inflection ${inflection.text}.`,
     apply(unit) {
