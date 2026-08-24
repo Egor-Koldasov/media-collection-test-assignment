@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090a0d" />
+    <meta name="description" content="The Twentieth Bell — a dark fantasy Three.js survival ritual." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>The Twentieth Bell</title>
+  </head>
+  <body>
+    <div id="app">
+      <div class="shell" inert>
+        <header class="topbar">
+          <div class="brand-lockup">
+            <div class="brand-mark" aria-hidden="true"><span>XX</span></div>
+            <div><p class="eyebrow">A survival ritual</p><h1>The Twentieth Bell</h1></div>
+          </div>
+          <div class="ritual-clock" aria-label="Survival timer">
+            <div class="clock-copy"><span id="clock-label">BELL I · THE WAKING</span><strong id="clock">20:00</strong></div>
+            <div class="clock-track"><i id="clock-progress"></i></div>
+          </div>
+          <div class="top-actions">
+            <div class="tally"><span>REMAINS</span><strong id="kill-count">0</strong></div>
+            <button id="archive-button" class="archive-button" type="button" aria-label="Open the persistent grave archive"><span>GRAVE ARCHIVE</span><strong id="archive-count">0/48</strong></button>
+            <button id="sound-button" class="icon-button" type="button" aria-label="Toggle sound" title="Toggle sound">♪</button>
+            <button id="pause-button" class="icon-button" type="button" aria-label="Pause game" title="Pause">Ⅱ</button>
+          </div>
+        </header>
+        <main class="game-layout">
+          <section class="battlefield-panel" aria-label="Battlefield">
+            <div id="stage" class="stage"></div><div class="stage-grain"></div>
+            <div class="stage-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <div class="threat-plaque"><span>Grave pressure</span><div class="threat-pips" id="threat-pips"></div></div>
+            <div id="intent-ledger" class="intent-ledger" aria-label="Enemy battle intentions">
+              <span data-intent="melee" title="Raised melee attacks"><i>†</i><small>BLADE</small><b id="intent-melee">0</b></span>
+              <span data-intent="ranged" title="Drawn ranged attacks"><i>➶</i><small>SHOT</small><b id="intent-ranged">0</b></span>
+              <span data-intent="support" title="Enemy ritualists on the field"><i>♪</i><small>CHOIR</small><b id="intent-support">0</b></span>
+              <span data-intent="elite" title="Elite graveborn on the field"><i>◆</i><small>CROWN</small><b id="intent-elite">0</b></span>
+            </div>
+            <div class="wave-inscription" id="wave-inscription">THE EARTH IS QUIET</div>
+            <div id="grave-law-strip" class="grave-law-strip" aria-label="Tonight's grave laws"></div>
+            <div id="encounter-banner" class="encounter-banner" aria-live="assertive" aria-hidden="true"><span id="encounter-sigil">☾</span><div><small>SPECIAL PROCESSION</small><strong id="encounter-title">THE HOUND MOON</strong><p id="encounter-omen">Ribcages learn the shape of hunger.</p></div></div>
+            <div class="paused-seal" id="paused-seal" hidden><span>RITUAL<br />SUSPENDED</span></div>
+          </section>
+          <aside class="folio" aria-label="Company folio">
+            <div class="folio-heading"><div><p class="eyebrow">The oathbound</p><h2>Your company</h2></div><span id="unit-count" class="wax-number">1</span></div>
+            <div id="roster" class="roster"></div>
+            <div id="selected-dossier" class="selected-dossier">
+              <div id="dossier-art" class="dossier-art"></div>
+              <div class="dossier-copy"><span id="dossier-role">AUTONOMOUS DOCTRINE</span><strong id="dossier-state">Awaiting an oathbound</strong><p id="dossier-doctrine">The field makes its own decisions.</p><div id="dossier-traits" class="dossier-traits"><span>UNMARKED</span></div></div>
+            </div>
+            <div class="sequence-panel"><div class="sequence-heading"><span>Automatic litany</span><small>wait → move → cast → advance</small></div><div id="sequence" class="sequence"></div></div>
+            <div class="omens"><div class="omens-heading"><span>Field omens</span><i></i></div><div id="combat-feed" class="combat-feed" aria-live="polite"></div></div>
+          </aside>
+        </main>
+        <footer class="bottombar"><span><kbd>CLICK</kbd> a portrait to inspect</span><span class="motto">No command reaches the field. Only preparation.</span><span id="codex-count">336 rites remain unwritten</span></footer>
+      </div>
+      <div id="modal" class="modal is-visible" role="dialog" aria-modal="true">
+        <div id="modal-backdrop" class="modal-backdrop concept-backdrop"></div><div class="modal-vignette"></div>
+        <section id="modal-content" class="modal-content intro-card">
+          <div class="intro-crest" aria-hidden="true"><span class="crest-ring"></span><span class="crest-skull"></span></div>
+          <p class="chapter">RITUAL OF THE LAST COMPANY</p>
+          <h2>The dead have nineteen minutes.<br /><em>You have twenty.</em></h2>
+          <p class="intro-copy">One nameless oathbound will answer the first bell. Others arrive by fate alone. They fight by a fixed litany of abilities—your only mercy is choosing what they become.</p>
+          <div class="rules-ribbon"><div><strong>20:00</strong><span>Survive the full rite</span></div><div><strong>AP</strong><span>Every act has a price</span></div><div><strong>∞</strong><span>The skeleton tide grows</span></div></div>
+          <div><p class="law-heading">TONIGHT THE GRAVE OBSERVES TWO LAWS</p><div id="intro-laws" class="intro-laws"></div><p id="intro-law-record" class="intro-law-record"></p></div>
+          <button id="start-button" class="primary-button" type="button"><span>Strike the first bell</span><i>→</i></button>
+          <p class="fine-print">Your company acts without orders. The sequence is law.</p>
+        </section>
+      </div>
+      <div id="grave-archive" class="grave-archive" role="dialog" aria-modal="true" aria-labelledby="archive-title" aria-hidden="true" inert>
+        <div class="archive-scrim"></div>
+        <section class="archive-ledger">
+          <button id="archive-close" class="archive-close" type="button" aria-label="Close the grave archive">×</button>
+          <div class="archive-illustration"><div><span>THE PERSISTENT LEDGER</span><h2 id="archive-title">The Grave Archive</h2><p>What one company learns, the next is unfortunate enough to inherit.</p></div></div>
+          <div id="archive-run-stats" class="archive-run-stats"></div>
+          <div class="archive-section-heading"><span>I</span><div><small>OSTEOLOGY</small><h3>Recorded graveborn</h3></div><strong id="enemy-discovery-count">0 / 12</strong></div>
+          <div id="archive-enemies" class="archive-enemies"></div>
+          <div class="archive-section-heading"><span>II</span><div><small>AUTHORED CALAMITIES</small><h3>Special processions</h3></div><strong id="encounter-discovery-count">0 / 6</strong></div>
+          <div id="archive-encounters" class="archive-encounters"></div>
+          <div class="archive-section-heading"><span>III</span><div><small>MARGINAL CORRUPTIONS</small><h3>Elite lineages</h3></div><strong id="affix-discovery-count">0 / 8</strong></div>
+          <div id="archive-affixes" class="archive-affixes"></div>
+          <div class="archive-section-heading"><span>IV</span><div><small>CONDITIONS OF THE NIGHT</small><h3>Recorded grave laws</h3></div><strong id="law-discovery-count">0 / 10</strong></div>
+          <div id="archive-laws" class="archive-laws"></div>
+          <div id="archive-pair-progress" class="archive-pair-progress"></div>
+          <div class="archive-section-heading"><span>V</span><div><small>OATHBOUND PROVENANCE</small><h3>Inherited origins</h3></div><strong id="origin-discovery-count">0 / 12</strong></div>
+          <div id="archive-origins" class="archive-origins"></div>
+          <div id="archive-rite-progress" class="archive-rite-progress"></div>
+        </section>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
