@@ -23,7 +23,10 @@ const BELL_BENEDICTIONS = {
 };
 const clamp = (value,min,max) => Math.max(min,Math.min(max,value));
 const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
-export const acceleratedPressure = (progress) => 1-Math.pow(1-clamp(progress,0,1),1.35);
+export const acceleratedPressure = (progress) => {
+  const normalized=clamp(progress,0,1),eased=1-Math.pow(1-normalized,1.35),openingFloor=normalized<=.1?.085+normalized*.48:0;
+  return Math.max(eased,openingFloor);
+};
 
 export const DIFFICULTY_PRESETS = [
   {level:1,name:'Mournful',roman:'I',detail:'A gentler procession for learning the rites.',health:.82,damage:.8,speed:.96,spawnInterval:1.18,capacity:.82},
