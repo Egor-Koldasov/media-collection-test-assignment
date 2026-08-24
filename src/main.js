@@ -19,7 +19,10 @@ const archive = $('#grave-archive');
 const encounterBanner = $('#encounter-banner');
 let latestSnapshot = null;
 let pendingUpgrade = null;
+let pendingUpgradeChoices = [];
 let upgradeUnitId = null;
+let upgradeInspectUnitId = null;
+let orderEditorOpen = false;
 let archivePreviousModalPause = false;
 let encounterTimer = 0;
 let inspectedAbilityIndex = null;
@@ -115,22 +118,26 @@ function closeArchive(){
 
 function renderRoster(snapshot) {
   const units=snapshot.units;
-  roster.innerHTML=units.map((unit)=>{
-    const hp=Math.max(0,unit.hp/unit.maxHp*100);const ap=Math.max(0,unit.ap/unit.maxAp*100);
-    return `<button class="unit-card ${unit.id===snapshot.selectedId?'is-selected':''} ${unit.alive?'':'is-dead'}" data-unit-id="${unit.id}" type="button" ${unit.alive?'':'disabled'}>
-      <span class="portrait" style="--unit-color:${unit.color};--portrait-position:${unit.portrait*25}%"></span>
-      <span class="unit-copy"><span class="unit-name"><strong>${unit.name}</strong><small>${unit.archetype}</small></span><span class="unit-doctrine">${unit.alive?(unit.aiState||'Reading the field'):'Fallen'}</span><span class="bar-pair"><span class="mini-bar hp"><i style="width:${hp}%"></i></span><span class="mini-bar ap"><i style="width:${ap}%"></i></span></span></span>
-      <span class="unit-level">${unit.level}<span>RANK</span></span>
-    </button>`;
-  }).join('');
-  roster.querySelectorAll('[data-unit-id]').forEach((button)=>button.addEventListener('click',()=>game.selectUnit(Number(button.dataset.unitId))));
+  const existing=new Map([...roster.querySelectorAll('[data-unit-id]')].map((button)=>[Number(button.dataset.unitId),button]));
+  units.forEach((unit)=>{
+    let button=existing.get(unit.id);
+    if(!button){
+      button=document.createElement('button');button.type='button';button.dataset.unitId=unit.id;button.innerHTML='<span class="portrait" data-roster-portrait></span><span class="unit-copy"><span class="unit-name"><strong data-roster-name></strong><small data-roster-archetype></small></span><span class="unit-doctrine" data-roster-doctrine></span><span class="bar-pair"><span class="mini-bar hp"><i data-roster-hp></i></span><span class="mini-bar ap"><i data-roster-ap></i></span></span></span><span class="unit-level"><strong data-roster-level></strong><span>RANK</span></span>';
+      roster.append(button);
+    }
+    existing.delete(unit.id);const hp=Math.max(0,unit.hp/unit.maxHp*100),ap=Math.max(0,unit.ap/unit.maxAp*100),portrait=button.querySelector('[data-roster-portrait]');
+    button.className=`unit-card ${unit.id===snapshot.selectedId?'is-selected':''} ${unit.alive?'':'is-dead'}`;button.disabled=!unit.alive;portrait.style.setProperty('--unit-color',unit.color);portrait.style.setProperty('--portrait-position',`${unit.portrait*25}%`);button.querySelector('[data-roster-name]').textContent=unit.name;button.querySelector('[data-roster-archetype]').textContent=unit.archetype;button.querySelector('[data-roster-doctrine]').textContent=unit.alive?(unit.aiState||'Reading the field'):'Fallen';button.querySelector('[data-roster-hp]').style.width=`${hp}%`;button.querySelector('[data-roster-ap]').style.width=`${ap}%`;button.querySelector('[data-roster-level]').textContent=unit.level;
+  });
+  existing.forEach((button)=>button.remove());
   const selected=units.find((unit)=>unit.id===snapshot.selectedId)||units.find((unit)=>unit.alive);
   renderSequence(selected);
   renderDossier(selected);
 }
 
 function renderSequence(unit) {
-  if(!unit){sequence.innerHTML='<span class="fine-print">The litany is silent.</span>';sequence.dataset.signature='';hideAbilityInspector();return}
+  const reorderButton=$('#reorder-button');
+  if(!unit){sequence.innerHTML='<span class="fine-print">The litany is silent.</span>';sequence.dataset.signature='';reorderButton.disabled=true;reorderButton.title='No living litany remains';hideAbilityInspector();return}
+  reorderButton.disabled=!unit.alive||unit.abilities.length<2;reorderButton.title=unit.abilities.length<2?'This oathbound knows only one rite':'Rewrite this litany at any time';
   sequence.style.gridTemplateColumns=`repeat(${unit.abilities.length},1fr)`;
   const signature=`${unit.id}:${unit.abilities.map((ability)=>ability.id).join('|')}`;
   if(sequence.dataset.signature!==signature){
@@ -191,27 +198,44 @@ function hideModal() {
   modal.setAttribute('aria-hidden','true');
 }
 
+function decisionAbilityMarkup(unit,ability,index){
+  const category=(ability.category||ability.kind).toUpperCase(),cost=Math.round(ability.cost*unit.mods.cost),range=ability.range>0?(ability.range+unit.mods.range).toFixed(1):'SELF';
+  return `<div class="decision-ability">${abilityArt(ability,'decision-ability-art ability-art')}<span class="decision-slot">${roman(index+1)}</span><span><strong>${ability.name}</strong><small>${category} · ${cost} AP · ${range} REACH</small><p>${ability.detail}</p></span></div>`;
+}
+
+function renderUpgradeCompanyReadout(snapshot){
+  const readout=$('#upgrade-company-readout');if(!readout)return;const living=snapshot.units.filter((unit)=>unit.alive);if(!living.length)return;
+  const inspected=living.find((unit)=>unit.id===upgradeInspectUnitId)||living.find((unit)=>unit.id===snapshot.selectedId)||living[0];upgradeInspectUnitId=inspected.id;
+  readout.innerHTML=`<div class="upgrade-readout-heading"><span>COMPANY LEDGER</span><strong>Inspect the possible bearer</strong></div><div class="upgrade-unit-tabs">${living.map((unit)=>`<button type="button" class="upgrade-unit-tab ${unit.id===inspected.id?'is-active':''}" data-inspect-upgrade-unit="${unit.id}"><span class="choice-portrait-mini" style="--portrait-position:${unit.portrait*25}%"></span><span><strong>${unit.name}</strong><small>${unit.archetype} · ${unit.abilities.length} ${unit.abilities.length===1?'RITE':'RITES'}</small></span></button>`).join('')}</div><div class="upgrade-ability-ledger"><div class="upgrade-bearer-meta"><span>${inspected.originSigil} ${inspected.origin}</span><small>${Math.ceil(inspected.hp)}/${Math.ceil(inspected.maxHp)} HEALTH · ${Math.floor(inspected.ap)}/${Math.floor(inspected.maxAp)} AP</small></div>${inspected.abilities.map((ability,index)=>decisionAbilityMarkup(inspected,ability,index)).join('')}</div>`;
+  readout.querySelectorAll('[data-inspect-upgrade-unit]').forEach((button)=>button.addEventListener('click',()=>{upgradeInspectUnitId=Number(button.dataset.inspectUpgradeUnit);renderUpgradeCompanyReadout(snapshot)}));
+}
+
 function renderUpgradeChoices(choices,snapshot) {
-  latestSnapshot=snapshot;pendingUpgrade=null;modalBackdrop.classList.remove('concept-backdrop');
+  latestSnapshot=snapshot;pendingUpgrade=null;pendingUpgradeChoices=choices;orderEditorOpen=false;modalBackdrop.classList.remove('concept-backdrop');
   modalContent.className='modal-content choice-view';
-  modalContent.innerHTML=`<p class="chapter">BELL ${roman(snapshot.bell)} · THE BLOOD BOOK OPENS</p><h2>Choose one truth to make real.</h2><p>Then name the oathbound who must carry it. Binding also rekindles some health, ward, and AP.</p><div class="upgrade-grid">${choices.map((upgrade,index)=>`<button class="upgrade-card tier-${upgrade.rarity} inflection-${upgrade.inflectionId}" type="button" data-upgrade="${index}" data-rune="${upgrade.rune}"><span class="card-top"><span>${upgrade.family} · ${upgrade.inflectionLabel}</span><span class="rarity-pips">${'◆'.repeat(upgrade.rarity)}${'◇'.repeat(4-upgrade.rarity)}</span></span><span class="${upgradeArtClass(upgrade)}" style="${upgradeArtStyle(upgrade)}" role="img" aria-label="Illustration for ${upgrade.shortName}"><i>${upgrade.sigil}</i><b>${upgrade.rune}</b></span><h3>${upgrade.name}</h3><p>${upgrade.description}</p><footer>Bind this rite <span>→</span></footer></button>`).join('')}</div>`;
+  modalContent.innerHTML=`<p class="chapter">BELL ${roman(snapshot.bell)} · THE BLOOD BOOK OPENS</p><h2>Choose one truth to make real.</h2><p>Inspect every current litany, then choose the rite and its bearer. Binding rekindles some health, ward, and AP.</p><div class="upgrade-decision-layout"><aside id="upgrade-company-readout" class="upgrade-company-readout"></aside><div class="upgrade-grid">${choices.map((upgrade,index)=>`<button class="upgrade-card tier-${upgrade.rarity} inflection-${upgrade.inflectionId}" type="button" data-upgrade="${index}" data-rune="${upgrade.rune}"><span class="card-top"><span>${upgrade.family} · ${upgrade.inflectionLabel}</span><span class="rarity-pips">${'◆'.repeat(upgrade.rarity)}${'◇'.repeat(4-upgrade.rarity)}</span></span><span class="${upgradeArtClass(upgrade)}" style="${upgradeArtStyle(upgrade)}" role="img" aria-label="Illustration for ${upgrade.shortName}"><i>${upgrade.sigil}</i><b>${upgrade.rune}</b></span><h3>${upgrade.name}</h3><p>${upgrade.description}</p><footer>Bind this rite <span>→</span></footer></button>`).join('')}</div></div>`;
+  renderUpgradeCompanyReadout(snapshot);
   modalContent.querySelectorAll('[data-upgrade]').forEach((button)=>button.addEventListener('click',()=>{pendingUpgrade=choices[Number(button.dataset.upgrade)];renderUnitChoice(snapshot)}));
   showModal();
 }
 
 function renderUnitChoice(snapshot) {
   const living=snapshot.units.filter((unit)=>unit.alive);
-  modalContent.innerHTML=`<p class="chapter">${pendingUpgrade.family} · ${'◆'.repeat(pendingUpgrade.rarity)}</p><h2>Who bears “${pendingUpgrade.shortName}”?</h2><p>The rite belongs to one body. Choose the sequence only after the binding.</p><div class="unit-choice-grid">${living.map((unit)=>`<button class="unit-choice" type="button" data-bind-unit="${unit.id}"><div class="choice-portrait" style="--portrait-position:${unit.portrait*25}%"></div><strong>${unit.name}</strong><span>${unit.archetype} · rank ${unit.level}</span><span class="choice-stats">${unit.originSigil} ${unit.origin}<br>${unit.aiState}<br>${Math.ceil(unit.hp)}/${Math.ceil(unit.maxHp)} health · ${Math.floor(unit.ap)}/${Math.floor(unit.maxAp)} AP</span><span class="choice-litany">${unit.abilities.map((ability)=>abilityArt(ability,'mini-ability-art')).join('<i>→</i>')}</span>${unit.traits.length?`<span class="choice-traits"><em>${unit.traits.slice(-2).join(' · ')}</em></span>`:''}</button>`).join('')}</div>`;
+  modalContent.innerHTML=`<button id="choose-another-upgrade" class="modal-back-button" type="button">← CHOOSE ANOTHER RITE</button><p class="chapter">${pendingUpgrade.family} · ${'◆'.repeat(pendingUpgrade.rarity)}</p><h2>Who bears “${pendingUpgrade.shortName}”?</h2><p>Every current ability is written below. The rite binds immediately; order may be rewritten from the folio whenever you wish.</p><div class="unit-choice-grid">${living.map((unit)=>`<button class="unit-choice" type="button" data-bind-unit="${unit.id}"><div class="choice-portrait" style="--portrait-position:${unit.portrait*25}%"></div><strong>${unit.name}</strong><span>${unit.archetype} · rank ${unit.level}</span><span class="choice-stats">${unit.originSigil} ${unit.origin}<br>${unit.aiState}<br>${Math.ceil(unit.hp)}/${Math.ceil(unit.maxHp)} health · ${Math.floor(unit.ap)}/${Math.floor(unit.maxAp)} AP</span><span class="unit-choice-abilities">${unit.abilities.map((ability,index)=>decisionAbilityMarkup(unit,ability,index)).join('')}</span>${unit.traits.length?`<span class="choice-traits"><em>${unit.traits.slice(-2).join(' · ')}</em></span>`:''}</button>`).join('')}</div>`;
+  $('#choose-another-upgrade').addEventListener('click',()=>renderUpgradeChoices(pendingUpgradeChoices,snapshot));
   modalContent.querySelectorAll('[data-bind-unit]').forEach((button)=>button.addEventListener('click',()=>{
-    upgradeUnitId=Number(button.dataset.bindUnit);const unit=game.applyUpgrade(pendingUpgrade,upgradeUnitId);renderOrderChoice(unit);
+    upgradeUnitId=Number(button.dataset.bindUnit);game.applyUpgrade(pendingUpgrade,upgradeUnitId);pendingUpgrade=null;hideModal();game.resumeAfterUpgrade();
   }));
 }
 
 function renderOrderChoice(unit) {
-  modalContent.innerHTML=`<p class="chapter">THE RITE IS BOUND</p><h2>Rewrite ${unit.name}’s litany.</h2><p class="order-hint">Position matters. The current ability also changes where the unit moves: melee closes, ranged kites, support seeks allies, and zones choose ground.</p><div class="order-list">${unit.abilities.map((ability,index)=>`<div class="order-row"><span class="slot">${roman(index+1)}</span>${abilityArt(ability,'ability-icon ability-art')}<span><strong>${ability.name}</strong><small>${(ability.category||ability.kind).toUpperCase()} · ${Math.round(ability.cost*unit.mods.cost)} AP · ${ability.detail}</small></span><span class="move-buttons"><button type="button" data-move="${index},${index-1}" ${index===0?'disabled':''} aria-label="Move ${ability.name} earlier">↑</button><button type="button" data-move="${index},${index+1}" ${index===unit.abilities.length-1?'disabled':''} aria-label="Move ${ability.name} later">↓</button></span></div>`).join('')}</div><button id="seal-order" class="primary-button" type="button"><span>Seal this order</span><i>→</i></button>`;
+  orderEditorOpen=true;upgradeUnitId=unit.id;modalContent.className='modal-content order-view';modalContent.innerHTML=`<p class="chapter">THE LITANY REMAINS YOURS</p><h2>Rewrite ${unit.name}’s order.</h2><p class="order-hint">Position matters. The current ability also changes where the unit moves: melee closes, ranged kites, support seeks allies, and zones choose ground.</p><div class="order-list">${unit.abilities.map((ability,index)=>`<div class="order-row"><span class="slot">${roman(index+1)}</span>${abilityArt(ability,'ability-icon ability-art')}<span><strong>${ability.name}</strong><small>${(ability.category||ability.kind).toUpperCase()} · ${Math.round(ability.cost*unit.mods.cost)} AP · ${ability.detail}</small></span><span class="move-buttons"><button type="button" data-move="${index},${index-1}" ${index===0?'disabled':''} aria-label="Move ${ability.name} earlier">↑</button><button type="button" data-move="${index},${index+1}" ${index===unit.abilities.length-1?'disabled':''} aria-label="Move ${ability.name} later">↓</button></span></div>`).join('')}</div><button id="seal-order" class="primary-button" type="button"><span>Return to the battle</span><i>→</i></button>`;
   modalContent.querySelectorAll('[data-move]').forEach((button)=>button.addEventListener('click',()=>{const [from,to]=button.dataset.move.split(',').map(Number);game.reorderAbility(upgradeUnitId,from,to);const refreshed=game.units.find((item)=>item.id===upgradeUnitId);renderOrderChoice(refreshed)}));
-  $('#seal-order').addEventListener('click',()=>{hideModal();game.resumeAfterUpgrade()});
+  $('#seal-order').addEventListener('click',closeOrderEditor);
 }
+
+function openOrderEditor(){const unit=game.units.find((item)=>item.id===game.selectedId&&item.alive);if(!unit||unit.abilities.length<2)return;game.setModalPaused(true);modalBackdrop.classList.remove('concept-backdrop');renderOrderChoice(unit);showModal()}
+function closeOrderEditor(){if(!orderEditorOpen)return;orderEditorOpen=false;hideModal();game.setModalPaused(false)}
 
 function renderOutcome(result) {
   if(result.victory){$('#clock').textContent='00:00';$('#clock-progress').style.width='100%';$('#clock-label').textContent='BELL XX · THE TWENTIETH BELL'}
@@ -237,9 +261,11 @@ $('#start-button').addEventListener('click',()=>game.start());
 $('#archive-button').addEventListener('click',openArchive);
 $('#archive-close').addEventListener('click',closeArchive);
 archive.querySelector('.archive-scrim').addEventListener('click',closeArchive);
+roster.addEventListener('click',(event)=>{const button=event.target.closest('[data-unit-id]');if(button&&!button.disabled)game.selectUnit(Number(button.dataset.unitId))});
+$('#reorder-button').addEventListener('click',openOrderEditor);
 $('#pause-button').addEventListener('click',()=>game.togglePause());
 $('#sound-button').addEventListener('click',(event)=>{const enabled=game.toggleSound();event.currentTarget.textContent=enabled?'♪':'×';event.currentTarget.title=enabled?'Mute sound':'Enable sound'});
-window.addEventListener('keydown',(event)=>{if(event.key!=='Escape')return;if(archive.classList.contains('is-visible'))closeArchive();else game.togglePause()});
+window.addEventListener('keydown',(event)=>{if(event.key!=='Escape')return;if(archive.classList.contains('is-visible'))closeArchive();else if(orderEditorOpen)closeOrderEditor();else game.togglePause()});
 
 $('#codex-count').textContent=`${UPGRADE_CATALOG.length} rites remain unwritten`;
 window.__TWENTIETH_BELL__=game;

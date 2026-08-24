@@ -63,9 +63,9 @@ export function generateOathbound(existingNames = [], arrival = 0, existingArche
   const archetype = pick(missingArchetypes.length?missingArchetypes:archetypes);
   let name = `${pick(firstNames)} ${pick(epithets)}`;
   while (existingNames.includes(name)) name = `${pick(firstNames)} ${pick(epithets)}`;
-  const abilityCount = Math.random() < .24 ? 4 : 3;
+  const abilityCount = Math.random() < .12 ? 2 : 1;
   const shuffled = [...archetype.pool].sort(() => Math.random() - .5).slice(0, abilityCount);const passiveKinds=new Set(['heal','ward','transfusion']);const isOffensive=(id)=>!passiveKinds.has(ABILITY_TEMPLATES.find((ability)=>ability.id===id)?.kind);
-  while(shuffled.filter(isOffensive).length<Math.min(2,abilityCount)){const replacement=archetype.pool.filter((id)=>isOffensive(id)&&!shuffled.includes(id))[0],passiveIndex=shuffled.findIndex((id)=>!isOffensive(id));if(!replacement||passiveIndex<0)break;shuffled[passiveIndex]=replacement}
+  while(shuffled.filter(isOffensive).length<1){const replacement=archetype.pool.filter((id)=>isOffensive(id)&&!shuffled.includes(id))[0],passiveIndex=shuffled.findIndex((id)=>!isOffensive(id));if(!replacement||passiveIndex<0)break;shuffled[passiveIndex]=replacement}
   const growth = 1 + arrival * .06;
   const starterGrace = arrival === 0 ? 1.24 : 1;
   const maxHp = Math.round(between(...archetype.hp) * growth * starterGrace * 1.15);

@@ -28,20 +28,23 @@ function atlasTexture(path){
   let texture;texture=new THREE.TextureLoader().load(path,()=>{texture.userData.atlasReady=true;texture.userData.atlasReadyCallbacks.splice(0).forEach((callback)=>callback(texture))});texture.userData.atlasReady=false;texture.userData.atlasReadyCallbacks=[];texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.ClampToEdgeWrapping;texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;texture.anisotropy=8;atlasTextureCache.set(path,texture);return texture;
 }
 
-function animatedAtlasPlane(path,columns,rows,index,opacity=1){
-  const column=index%columns,row=Math.floor(index/columns),uniforms={uMap:{value:atlasTexture(path)},uAtlas:{value:new THREE.Vector2(columns,rows)},uCell:{value:new THREE.Vector2(column,rows-row-1)},uTime:{value:0},uMotion:{value:0},uAction:{value:0},uPhase:{value:Math.random()*9},uOpacity:{value:opacity}};
+function animatedAtlasPlane(path,columns,rows,frameCell,opacity=1){
+  const resolveCell=typeof frameCell==='function'?frameCell:()=>[frameCell%columns,Math.floor(frameCell/columns)],[column,row]=resolveCell(0),uniforms={uMap:{value:atlasTexture(path)},uAtlas:{value:new THREE.Vector2(columns,rows)},uCell:{value:new THREE.Vector2(column,rows-row-1)},uTime:{value:0},uMotion:{value:0},uAction:{value:0},uStride:{value:0},uLean:{value:0},uPhase:{value:Math.random()*9},uOpacity:{value:opacity}};
   const material=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,vertexShader:`
     varying vec2 vUv;
     uniform float uTime;
     uniform float uMotion;
     uniform float uAction;
+    uniform float uStride;
+    uniform float uLean;
     uniform float uPhase;
     void main(){
-      vUv=uv;vec3 p=position;float body=sin(uv.y*3.14159265);float stride=sin(uTime*(7.0+uMotion*4.0)+uPhase);
-      p.x+=sin(uTime*2.15+uPhase+uv.y*5.4)*body*(.012+.022*uMotion);
-      p.x+=(1.0-smoothstep(.08,.34,uv.y))*stride*sign(uv.x-.5)*uMotion*.035;
-      p.y+=sin(uTime*1.75+uPhase)*.01+abs(stride)*uMotion*(1.0-uv.y)*.018;
-      p.x+=uAction*pow(uv.y,1.45)*.072;p.y+=uAction*body*.028;
+      vUv=uv;vec3 p=position;float body=sin(uv.y*3.14159265);float hem=1.0-smoothstep(.08,.42,uv.y);float shoulders=smoothstep(.48,.9,uv.y);
+      p.x+=sin(uTime*2.05+uPhase+uv.y*5.8)*body*(.008+.016*uMotion);
+      p.x+=hem*uStride*sign(uv.x-.5)*uMotion*.025;
+      p.x+=uLean*(uv.y-.18)*(.055+.025*shoulders);
+      p.y+=sin(uTime*1.62+uPhase)*.007+abs(uStride)*uMotion*hem*.012;
+      p.x+=uAction*shoulders*.052;p.y+=uAction*body*.018;
       gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);
     }`,fragmentShader:`
     varying vec2 vUv;
@@ -55,7 +58,7 @@ function animatedAtlasPlane(path,columns,rows,index,opacity=1){
       painted.rgb+=vec3(.24,.065,.035)*uAction*(.35+.65*vUv.y);
       gl_FragColor=vec4(painted.rgb,painted.a*uOpacity);
     }`});
-  const sprite=new THREE.Mesh(new THREE.PlaneGeometry(1,1,12,18),material);sprite.userData.spriteUniforms=uniforms;return sprite;
+  const sprite=new THREE.Mesh(new THREE.PlaneGeometry(1,1,12,18),material);sprite.userData.spriteUniforms=uniforms;sprite.userData.animationFrame=-1;sprite.userData.setAnimationFrame=(frame)=>{if(sprite.userData.animationFrame===frame)return;const [nextColumn,nextRow]=resolveCell(frame);uniforms.uCell.value.set(nextColumn,rows-nextRow-1);sprite.userData.animationFrame=frame};sprite.userData.setAnimationFrame(0);return sprite;
 }
 
 function makeRune(radius,angle,color=0x8e7056){
@@ -185,8 +188,8 @@ function createHeroBody(unit){
 }
 
 export function createHeroVisual(unit){
-  const group=new THREE.Group();const shadow=ellipse(.7,.25,flat(0x000000,.43),28);shadow.position.set(0,-.83,-.1);const selection=ellipseLoop(.82,.58,0xd5a25c,0,48);selection.position.set(0,-.34,-.05);
-  const body=new THREE.Group(),sprite=animatedAtlasPlane('/assets/oathbound-sprites.png',5,1,unit.portrait);sprite.scale.set(1.2,3,1);sprite.position.set(0,.25,.14);body.add(sprite);const originRelic=createOriginRelic(unit);originRelic.scale.setScalar(.82);group.add(shadow,selection,body,originRelic);const hp=makeBar(1.16,0xc33d44);hp.position.set(0,-1.12,.33);const ap=makeBar(1.16,0x7e89bd);ap.position.set(0,-1.22,.33);const shield=ellipseLoop(.79,.56,0x8b96c5,0,48);shield.position.set(0,-.25,.31);group.add(hp,ap,shield);
+  const group=new THREE.Group();const shadow=ellipse(.52,.18,flat(0x000000,.43),28);shadow.position.set(0,-.67,-.1);const selection=ellipseLoop(.62,.44,0xd5a25c,0,48);selection.position.set(0,-.22,-.05);
+  const body=new THREE.Group(),sprite=animatedAtlasPlane('/assets/oathbound-animation-v2.png',5,4,(frame)=>[unit.portrait,frame]);sprite.scale.set(.82,1.95,1);sprite.position.set(0,.12,.14);body.add(sprite);const originRelic=createOriginRelic(unit);originRelic.scale.setScalar(.62);group.add(shadow,selection,body,originRelic);const hp=makeBar(.92,0xc33d44);hp.position.set(0,-.79,.33);const ap=makeBar(.92,0x7e89bd);ap.position.set(0,-.89,.33);const shield=ellipseLoop(.61,.44,0x8b96c5,0,48);shield.position.set(0,-.18,.31);group.add(hp,ap,shield);
   const riteHalo=new THREE.Group();[0xd5a25c,0xd6504f,0x7f8dbb,0xc49b67,0x9d6ca5,0xd9c77e].forEach((color,index)=>{const mark=polygon([[0,.09],[.065,0],[0,-.09],[-.065,0]],color,.76);mark.position.z=.42;mark.visible=false;mark.userData={phase:index/6*Math.PI*2};riteHalo.add(mark)});group.add(riteHalo);
   group.userData={selection,hp,ap,shield,riteHalo,body,sprite,originRelic,phase:Math.random()*9,castPulse:0};return group;
 }
@@ -230,7 +233,7 @@ function createHumanoidSkeleton(enemy,bone){
 }
 
 export function createSkeletonVisual(enemy){
-  const group=new THREE.Group();const shadow=ellipse(.62,.22,flat(0x000000,.4),24);shadow.position.set(0,-.72,-.1);const body=new THREE.Group(),sprite=animatedAtlasPlane('/assets/undead-sprites.png',4,3,Math.max(0,enemyArtOrder.indexOf(enemy.type)),enemy.template.phase?.72:1);sprite.scale.set(1.84,2.45,1);sprite.position.set(0,0,.14);body.add(sprite);group.add(shadow,body);
+  const group=new THREE.Group();const shadow=ellipse(.62,.22,flat(0x000000,.4),24);shadow.position.set(0,-.72,-.1);const body=new THREE.Group(),artIndex=Math.max(0,enemyArtOrder.indexOf(enemy.type)),baseColumn=artIndex%4*2,baseRow=Math.floor(artIndex/4)*2,frameOffsets=[[0,0],[1,0],[0,1],[1,1]],sprite=animatedAtlasPlane('/assets/undead-animation-v2.png',8,6,(frame)=>[baseColumn+frameOffsets[frame][0],baseRow+frameOffsets[frame][1]],enemy.template.phase?.72:1);sprite.scale.set(1.84,2.45,1);sprite.position.set(0,0,.14);body.add(sprite);group.add(shadow,body);
   const hp=makeBar(.88,0x9e2d33);hp.position.set(0,-1.18,.3);hp.visible=enemy.elite||enemy.type!=='thrall'&&enemy.type!=='hound';const ap=makeBar(.88,0x737eaa);ap.position.set(0,-1.28,.3);ap.visible=enemy.elite||enemy.template.ranged||enemy.template.aura||enemy.template.bishop||enemy.template.giant;const statusRing=ellipseLoop(.62,.44,0x8faac3,0,40);statusRing.position.set(0,-.27,.25);const shieldRing=ellipseLoop(.68,.49,0x91a7c8,0,44);shieldRing.position.set(0,-.27,.27);const eliteRing=ellipseLoop(.76,.54,enemy.affixColor,enemy.elite?.48:0,48);eliteRing.position.set(0,-.27,.23);const crown=new THREE.Group();
   if(enemy.elite){enemy.affixes.forEach((affix,index)=>{const mark=polygon([[0,.11],[.08,0],[0,-.11],[-.08,0]],affix.color,.92);mark.position.set((index-(enemy.affixes.length-1)/2)*.19,enemy.template.beast?.55:.88,.32);crown.add(mark)})}
   group.add(hp,ap,statusRing,shieldRing,eliteRing,crown);group.scale.setScalar(enemy.template.scale*(enemy.elite?1.04+enemy.affixes.length*.035:1));
@@ -239,14 +242,15 @@ export function createSkeletonVisual(enemy){
 
 export function updateEntityVisual(entity,selected=false,time=0){
   if(!entity.mesh)return;entity.mesh.position.set(entity.x,entity.y,entity.kind==='hero'?.12:.08);const ratio=Math.max(0,entity.hp/entity.maxHp);const hpBar=entity.mesh.userData.hp;if(hpBar){hpBar.userData.fill.scale.x=ratio;hpBar.userData.fill.position.x=-(hpBar.userData.width*(1-ratio))/2}
-  const speed=Math.hypot(entity.vx||0,entity.vy||0);const facing=(entity.vx||0)<-.04?-1:1,spriteUniforms=entity.mesh.userData.sprite?.userData?.spriteUniforms;if(spriteUniforms){spriteUniforms.uTime.value=time*.001;spriteUniforms.uMotion.value=Math.min(1,speed/1.6)}
+  const speed=Math.hypot(entity.vx||0,entity.vy||0),motion=Math.min(1,speed/1.6),facing=(entity.vx||0)<-.04?-1:1,sprite=entity.mesh.userData.sprite,spriteUniforms=sprite?.userData?.spriteUniforms,phase=entity.visualPhase??entity.mesh.userData.phase??0,cadence=time*(entity.kind==='hero'?.0092:.0076)+phase,stride=Math.sin(cadence*Math.PI/2),previousVx=entity.mesh.userData.previousVx??entity.vx??0,acceleration=(entity.vx||0)-previousVx;entity.mesh.userData.previousVx=entity.vx||0;const lean=Math.max(-1,Math.min(1,(entity.vx||0)*.28+acceleration*1.7));
+  const action=entity.kind==='hero'?entity.mesh.userData.castPulse||0:entity.attackWindup>0?Math.min(1,.42+entity.attackWindup):0,gaitFrames=[1,0,2,0],frame=action>.16?3:motion>.075?gaitFrames[Math.floor(cadence)%gaitFrames.length]:0;sprite?.userData?.setAnimationFrame?.(frame);
+  if(spriteUniforms){spriteUniforms.uTime.value=time*.001;spriteUniforms.uMotion.value=motion;spriteUniforms.uAction.value=action;spriteUniforms.uStride.value=stride;spriteUniforms.uLean.value=lean}
   if(entity.kind==='hero'){
-    const apRatio=Math.max(0,entity.ap/entity.maxAp),apBar=entity.mesh.userData.ap;apBar.userData.fill.scale.x=apRatio;apBar.userData.fill.position.x=-(apBar.userData.width*(1-apRatio))/2;entity.mesh.userData.selection.material.opacity=selected?.78:0;entity.mesh.userData.body.scale.x=facing;
-    const stride=Math.sin(time*.012+entity.visualPhase)*Math.min(1,speed);if(entity.mesh.userData.leftLeg)entity.mesh.userData.leftLeg.rotation.z=stride*.22;if(entity.mesh.userData.rightLeg)entity.mesh.userData.rightLeg.rotation.z=-stride*.22;if(entity.mesh.userData.leftArm)entity.mesh.userData.leftArm.rotation.z=-stride*.1;if(entity.mesh.userData.rightArm)entity.mesh.userData.rightArm.rotation.z=stride*.1;
-    entity.mesh.position.y+=Math.sin(time*.003+entity.visualPhase)*.025+Math.abs(stride)*.018;entity.mesh.userData.castPulse*=.91;const pulse=entity.mesh.userData.castPulse||0;entity.mesh.userData.body.scale.y=1+pulse*.035;if(spriteUniforms)spriteUniforms.uAction.value=pulse;entity.mesh.userData.shield.material.opacity=entity.shield>0?.18+Math.sin(time*.004)*.07:0;entity.mesh.userData.shield.rotation.z+=.006;
-    if(entity.mesh.userData.weapon)entity.mesh.userData.weapon.rotation.z=pulse*.55+stride*.08;if(entity.mesh.userData.accent?.material)entity.mesh.userData.accent.material.opacity=clampOpacity((entity.mesh.userData.accent.material.opacity||.7)+Math.sin(time*.006+entity.visualPhase)*.02);const riteHalo=entity.mesh.userData.riteHalo;if(riteHalo){const visible=Math.min(riteHalo.children.length,entity.traits?.length||0),radius=.68+Math.min(.22,visible*.025);riteHalo.children.forEach((mark,index)=>{mark.visible=index<visible;if(!mark.visible)return;const angle=time*.00072+mark.userData.phase;mark.position.x=Math.cos(angle)*radius;mark.position.y=Math.sin(angle)*radius*.72-.04;mark.rotation.z=-angle+Math.PI/4;mark.material.opacity=.48+Math.sin(time*.003+index)*.22});riteHalo.rotation.z=Math.sin(time*.0004+entity.visualPhase)*.08}const originRelic=entity.mesh.userData.originRelic;if(originRelic){originRelic.rotation.z=Math.sin(time*.0014+entity.visualPhase)*.018;const relicBreath=1+Math.sin(time*.0021+entity.visualPhase)*.025;originRelic.scale.set(relicBreath,relicBreath,1)}
+    const apRatio=Math.max(0,entity.ap/entity.maxAp),apBar=entity.mesh.userData.ap,body=entity.mesh.userData.body;apBar.userData.fill.scale.x=apRatio;apBar.userData.fill.position.x=-(apBar.userData.width*(1-apRatio))/2;entity.mesh.userData.selection.material.opacity=selected?.78:0;body.scale.x=facing*(1+motion*Math.cos(cadence*Math.PI/2)*.018);body.scale.y=1+action*.028-motion*Math.abs(stride)*.012;body.rotation.z=-lean*facing*.028+stride*motion*.008;
+    entity.mesh.position.y+=Math.sin(time*.0022+phase)*.012+Math.abs(stride)*motion*.026;entity.mesh.position.x+=Math.cos(cadence*Math.PI/2)*motion*.006;entity.mesh.userData.castPulse*=.91;entity.mesh.userData.shield.material.opacity=entity.shield>0?.18+Math.sin(time*.004)*.07:0;entity.mesh.userData.shield.rotation.z+=.006;
+    const riteHalo=entity.mesh.userData.riteHalo;if(riteHalo){const visible=Math.min(riteHalo.children.length,entity.traits?.length||0),radius=.58+Math.min(.18,visible*.022);riteHalo.children.forEach((mark,index)=>{mark.visible=index<visible;if(!mark.visible)return;const angle=time*.00072+mark.userData.phase;mark.position.x=Math.cos(angle)*radius;mark.position.y=Math.sin(angle)*radius*.72-.04;mark.rotation.z=-angle+Math.PI/4;mark.material.opacity=.48+Math.sin(time*.003+index)*.22});riteHalo.rotation.z=Math.sin(time*.0004+phase)*.08}const originRelic=entity.mesh.userData.originRelic;if(originRelic){originRelic.rotation.z=Math.sin(time*.0014+phase)*.018;const relicBreath=.62*(1+Math.sin(time*.0021+phase)*.025);originRelic.scale.set(relicBreath,relicBreath,1)}
   }else{
-    const winding=entity.attackWindup>0;entity.mesh.userData.body.scale.x=facing;entity.mesh.userData.body.scale.y=1+(winding?.035:0);if(spriteUniforms)spriteUniforms.uAction.value=winding?Math.min(1,.35+(entity.attackWindup||0)):0;entity.mesh.position.y+=Math.abs(Math.sin(time*.009+entity.mesh.userData.phase))*Math.min(.035,speed*.025);if(entity.mesh.userData.skull)entity.mesh.userData.skull.rotation.z=Math.sin(time*.008+entity.mesh.userData.phase)*.1+(winding?(entity.template.ranged?-.08:.12):0);if(entity.mesh.userData.weapon){const attackPose=winding?(entity.template.ranged?-.34:entity.template.cleave?.68:.5):0;entity.mesh.userData.weapon.rotation.z=attackPose+Math.sin(time*.006+entity.mesh.userData.phase)*.08}const apBar=entity.mesh.userData.ap;if(apBar){const apRatio=Math.max(0,entity.ap/entity.maxAp);apBar.userData.fill.scale.x=apRatio;apBar.userData.fill.position.x=-(apBar.userData.width*(1-apRatio))/2;apBar.userData.fill.material.color.set(winding?0xd05b52:0x737eaa)}
+    const winding=entity.attackWindup>0,body=entity.mesh.userData.body;body.scale.x=facing*(1+motion*Math.cos(cadence*Math.PI/2)*.014);body.scale.y=1+(winding?.025:0)-motion*Math.abs(stride)*.01;body.rotation.z=-lean*facing*.022+stride*motion*.006;entity.mesh.position.y+=Math.abs(stride)*Math.min(.034,speed*.024);entity.mesh.position.x+=Math.cos(cadence*Math.PI/2)*motion*.004;const apBar=entity.mesh.userData.ap;if(apBar){const apRatio=Math.max(0,entity.ap/entity.maxAp);apBar.userData.fill.scale.x=apRatio;apBar.userData.fill.position.x=-(apBar.userData.width*(1-apRatio))/2;apBar.userData.fill.material.color.set(winding?0xd05b52:0x737eaa)}
     const status=entity.status;const ring=entity.mesh.userData.statusRing;if(status.burn>0){ring.material.color.set(0xc75c3e);ring.material.opacity=.42}else if(status.brittle>0){ring.material.color.set(0x8faac3);ring.material.opacity=.38}else if(status.curse>0){ring.material.color.set(0x9a5ca7);ring.material.opacity=.4}else ring.material.opacity=0;ring.rotation.z+=.01;const eliteRing=entity.mesh.userData.eliteRing;if(eliteRing){eliteRing.rotation.z+=.008;eliteRing.material.opacity=entity.elite?.34+Math.sin(time*.004+entity.mesh.userData.phase)*.14:0}const shieldRing=entity.mesh.userData.shieldRing;if(shieldRing){shieldRing.material.opacity=entity.shield>0?.2+Math.sin(time*.006)*.1:0;shieldRing.rotation.z-=.012}if(entity.mesh.userData.crown)entity.mesh.userData.crown.position.y=Math.sin(time*.004+entity.mesh.userData.phase)*.035;
   }
 }
