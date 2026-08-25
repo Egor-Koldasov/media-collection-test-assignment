@@ -1,6 +1,7 @@
 globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({font:'',textAlign:'',fillStyle:'',shadowColor:'',shadowBlur:0,fillText(){}})})};
 
-const {Game}=await import('../src/game/Game.js');
+const {Game,UPGRADE_DROP_TIMES}=await import('../src/game/Game.js');
+const {getUpgradeRarityProfile}=await import('../src/game/catalog.js');
 
 const rolePreferences={
   vanguard:['Melee','Violence','Defense','Body','Sustain'],
@@ -49,6 +50,12 @@ const report={
     wins:results.filter((run)=>run.victory).length,total:results.length,
     medianSeconds:elapsed[Math.floor(elapsed.length/2)],minimumSeconds:elapsed[0],maximumSeconds:elapsed.at(-1),
     averageKills:Math.round(results.reduce((sum,run)=>sum+run.kills,0)/results.length)
+  },
+  upgradeProgression:{
+    drops:UPGRADE_DROP_TIMES.length,
+    atSeconds:UPGRADE_DROP_TIMES,
+    intervals:UPGRADE_DROP_TIMES.map((time,index)=>time-(UPGRADE_DROP_TIMES[index-1]||0)),
+    rarityStages:[0,.2,.45,.7,.88,1].map((progress)=>({progress,profile:getUpgradeRarityProfile(progress)}))
   },
   runs:results
 };

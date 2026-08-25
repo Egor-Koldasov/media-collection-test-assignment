@@ -39,7 +39,6 @@ const enemyTactics={
 
 const pips = $('#threat-pips');
 for (let i=0;i<7;i+=1) pips.insertAdjacentHTML('beforeend','<i></i>');
-const intentMetrics={melee:'meleeIntents',ranged:'rangedIntents',support:'supportCount',elite:'eliteCount'};
 
 const pad = (number) => String(number).padStart(2,'0');
 function formatTime(seconds) {
@@ -66,7 +65,6 @@ function renderHud(snapshot) {
   $('#codex-count').textContent=`${snapshot.codexSize} rites · ${snapshot.upgradeCount} inscribed`;
   renderArchiveBadge(snapshot);
   [...pips.children].forEach((pip,index)=>pip.classList.toggle('is-lit',index<snapshot.threat));
-  Object.entries(intentMetrics).forEach(([intent,key])=>{const value=snapshot[key]||0,cell=$(`[data-intent="${intent}"]`);$(`#intent-${intent}`).textContent=value;cell.classList.toggle('is-active',value>0)});
   const livingCount=snapshot.units.filter((unit)=>unit.alive).length;$('#wave-inscription').textContent=snapshot.currentEncounter?.title||(snapshot.eliteCount>4?'THE CORRUPTED DEAD CONVENE':snapshot.elapsed>120&&livingCount<3?'THE LAST COMPANY QUICKENS':snapshot.zoneCount>2?'THE GROUND REMEMBERS EVERY RITE':snapshot.enemyCount>28?'THE GROUND CANNOT BE SEEN':snapshot.enemyCount>16?'THE OSSUARY OPENS':snapshot.enemyCount>6?'BONE ANSWERS BONE':'THE EARTH IS LISTENING');
   renderRoster(snapshot);
 }
@@ -119,11 +117,11 @@ function renderRoster(snapshot) {
   units.forEach((unit)=>{
     let button=existing.get(unit.id);
     if(!button){
-      button=document.createElement('button');button.type='button';button.dataset.unitId=unit.id;button.innerHTML='<span class="portrait" data-roster-portrait></span><span class="unit-copy"><span class="unit-name"><strong data-roster-name></strong><small data-roster-archetype></small></span><span class="unit-doctrine" data-roster-doctrine></span><span class="bar-pair"><span class="mini-bar hp"><i data-roster-hp></i></span><span class="mini-bar ap"><i data-roster-ap></i></span></span></span><span class="unit-level"><strong data-roster-level></strong><span>RANK</span></span>';
+      button=document.createElement('button');button.type='button';button.dataset.unitId=unit.id;button.innerHTML='<span class="portrait" data-roster-portrait></span><span class="unit-copy"><span class="unit-name"><strong data-roster-name></strong><small data-roster-archetype></small></span><span class="unit-doctrine" data-roster-doctrine></span><span class="unit-vitals"><span><small>HP</small><b data-roster-hp-value></b></span><span><small>AP</small><b data-roster-ap-value></b></span></span><span class="bar-pair"><span class="mini-bar hp"><i data-roster-hp></i></span><span class="mini-bar ap"><i data-roster-ap></i></span></span></span><span class="unit-level"><strong data-roster-level></strong><span>RANK</span></span>';
       roster.append(button);
     }
     existing.delete(unit.id);const hp=Math.max(0,unit.hp/unit.maxHp*100),ap=Math.max(0,unit.ap/unit.maxAp*100),portrait=button.querySelector('[data-roster-portrait]');
-    button.className=`unit-card ${unit.id===snapshot.selectedId?'is-selected':''} ${unit.alive?'':'is-dead'}`;button.disabled=!unit.alive;portrait.style.setProperty('--unit-color',unit.color);portrait.style.setProperty('--portrait-position',`${unit.portrait*25}%`);button.querySelector('[data-roster-name]').textContent=unit.name;button.querySelector('[data-roster-archetype]').textContent=unit.archetype;button.querySelector('[data-roster-doctrine]').textContent=unit.alive?(unit.aiState||'Reading the field'):'Fallen';button.querySelector('[data-roster-hp]').style.width=`${hp}%`;button.querySelector('[data-roster-ap]').style.width=`${ap}%`;button.querySelector('[data-roster-level]').textContent=unit.level;
+    button.className=`unit-card ${unit.id===snapshot.selectedId?'is-selected':''} ${unit.alive?'':'is-dead'}`;button.disabled=!unit.alive;portrait.style.setProperty('--unit-color',unit.color);portrait.style.setProperty('--portrait-position',`${unit.portrait*25}%`);button.querySelector('[data-roster-name]').textContent=unit.name;button.querySelector('[data-roster-archetype]').textContent=unit.archetype;button.querySelector('[data-roster-doctrine]').textContent=unit.alive?(unit.aiState||'Reading the field'):'Fallen';button.querySelector('[data-roster-hp-value]').textContent=`${Math.ceil(Math.max(0,unit.hp))}/${Math.ceil(unit.maxHp)}`;button.querySelector('[data-roster-ap-value]').textContent=`${Math.floor(Math.max(0,unit.ap))}/${Math.floor(unit.maxAp)}`;button.querySelector('[data-roster-hp]').style.width=`${hp}%`;button.querySelector('[data-roster-ap]').style.width=`${ap}%`;button.querySelector('[data-roster-level]').textContent=unit.level;
   });
   existing.forEach((button)=>button.remove());
   const selected=units.find((unit)=>unit.id===snapshot.selectedId)||units.find((unit)=>unit.alive);
@@ -256,6 +254,7 @@ roster.addEventListener('click',(event)=>{const button=event.target.closest('[da
 $('#reorder-button').addEventListener('click',openOrderEditor);
 $('#pause-button').addEventListener('click',()=>game.togglePause());
 $('#sound-button').addEventListener('click',(event)=>{const enabled=game.toggleSound();event.currentTarget.textContent=enabled?'♪':'×';event.currentTarget.title=enabled?'Mute sound':'Enable sound'});
+document.addEventListener('click',(event)=>{if(event.target.closest('button'))game.playUi()},{capture:true});
 window.addEventListener('keydown',(event)=>{if(event.key!=='Escape')return;if(archive.classList.contains('is-visible'))closeArchive();else if(orderEditorOpen)closeOrderEditor();else game.togglePause()});
 
 $('#codex-count').textContent=`${UPGRADE_CATALOG.length} rites remain unwritten`;

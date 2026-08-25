@@ -21,6 +21,23 @@ const BELL_BENEDICTIONS = {
   18:{title:'FINAL DEFIANCE',sigil:'◆',omen:'The last company spends tomorrow before it arrives.',shield:.22,heal:.18,ap:.5},
   19:{title:'THE PENULTIMATE OATH',sigil:'✦',omen:'One minute remains. Every unwritten dawn is wagered now.',shield:.2,heal:.16,ap:.5}
 };
+const audioVariants=(stem)=>Array.from({length:3},(_,index)=>`/audio/${stem}-0${index+1}.mp3`);
+export const AUDIO_FAMILIES={
+  graveAmbience:{files:audioVariants('grave-ambience'),gain:.24,limit:1,pitch:0},
+  ritualBell:{files:audioVariants('ritual-bell'),gain:.86,limit:2,pitch:.012},
+  meleeRelease:{files:audioVariants('melee-release'),gain:.38,limit:5,pitch:.025},
+  arcaneRelease:{files:audioVariants('arcane-release'),gain:.34,limit:5,pitch:.025},
+  supportWard:{files:audioVariants('support-ward'),gain:.36,limit:4,pitch:.018},
+  enemyBlade:{files:audioVariants('enemy-blade'),gain:.3,limit:5,pitch:.028},
+  enemyBow:{files:audioVariants('enemy-bow'),gain:.33,limit:5,pitch:.024},
+  combatImpact:{files:audioVariants('combat-impact'),gain:.3,limit:7,pitch:.035},
+  skeletonDeath:{files:audioVariants('skeleton-death'),gain:.35,limit:5,pitch:.028},
+  heroWound:{files:audioVariants('hero-wound'),gain:.43,limit:3,pitch:.022},
+  reliquary:{files:audioVariants('reliquary'),gain:.55,limit:2,pitch:.012},
+  upgradeBinding:{files:audioVariants('upgrade-binding'),gain:.62,limit:1,pitch:.008},
+  uiParchment:{files:audioVariants('ui-parchment'),gain:.24,limit:3,pitch:.02}
+};
+export const UPGRADE_DROP_TIMES=[20,40,60,85,110,140,170,205,240,280,325,375,430,490,555,625,700,780,865,955,1055,1165];
 const clamp = (value,min,max) => Math.max(min,Math.min(max,value));
 const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
 export const acceleratedPressure = (progress) => {
@@ -37,21 +54,29 @@ export const DIFFICULTY_PRESETS = [
 ];
 
 class RitualAudio {
-  constructor(){this.context=null;this.master=null;this.enabled=true;this.drone=null}
+  constructor(){this.context=null;this.master=null;this.enabled=true;this.paused=false;this.buffers=new Map();this.bags=new Map();this.lastVariant=new Map();this.active=new Map();this.preloadPromise=null;this.ambience=null}
   start(){
-    if(this.context)return;
+    if(this.context){if(this.context.state==='suspended')this.context.resume();return this.preloadPromise}
     const AudioContext=window.AudioContext||window.webkitAudioContext;if(!AudioContext)return;
-    this.context=new AudioContext();this.master=this.context.createGain();this.master.gain.value=.15;this.master.connect(this.context.destination);
-    const low=this.context.createOscillator();const lowGain=this.context.createGain();low.type='sine';low.frequency.value=43.65;lowGain.gain.value=.03;low.connect(lowGain).connect(this.master);low.start();
-    const high=this.context.createOscillator();const highGain=this.context.createGain();high.type='triangle';high.frequency.value=65.4;highGain.gain.value=.012;high.connect(highGain).connect(this.master);high.start();this.drone=[low,high];
+    this.context=new AudioContext();this.master=this.context.createGain();this.master.gain.value=.42;this.master.connect(this.context.destination);this.preloadPromise=this.preload().then(()=>this.startAmbience());return this.preloadPromise;
   }
-  tone(frequency=180,duration=.08,volume=.08,type='triangle',endRatio=.62){
-    if(!this.enabled||!this.context)return;const now=this.context.currentTime;const osc=this.context.createOscillator();const gain=this.context.createGain();osc.type=type;osc.frequency.setValueAtTime(frequency,now);osc.frequency.exponentialRampToValueAtTime(Math.max(30,frequency*endRatio),now+duration);gain.gain.setValueAtTime(volume,now);gain.gain.exponentialRampToValueAtTime(.001,now+duration);osc.connect(gain).connect(this.master);osc.start(now);osc.stop(now+duration+.02);
+  async preload(){
+    await Promise.all(Object.values(AUDIO_FAMILIES).flatMap((family)=>family.files.map(async(path)=>{try{const response=await fetch(path);if(!response.ok)throw new Error(`${response.status} ${path}`);this.buffers.set(path,await this.context.decodeAudioData(await response.arrayBuffer()))}catch(error){console.warn('The grave misplaced a sound.',error)}})));
   }
-  bell(index=1){if(!this.enabled||!this.context)return;[1,1.49,2.14,2.71].forEach((ratio,i)=>this.tone(82*ratio+index*2,1.4,.11/(i+1),'sine',.9))}
-  blade(){this.tone(220,.11,.045,'sawtooth',1.8)}
-  ward(){this.tone(420,.34,.035,'sine',.72)}
-  toggle(){this.enabled=!this.enabled;if(this.master)this.master.gain.value=this.enabled?.15:0;return this.enabled}
+  nextPath(name){
+    const family=AUDIO_FAMILIES[name];if(!family)return null;let bag=this.bags.get(name)||[];if(!bag.length){bag=family.files.map((_,index)=>index).sort(()=>Math.random()-.5);const last=this.lastVariant.get(name);if(bag.length>1&&bag.at(-1)===last)[bag[0],bag[bag.length-1]]=[bag.at(-1),bag[0]]}
+    const index=bag.pop();this.bags.set(name,bag);this.lastVariant.set(name,index);return family.files[index];
+  }
+  play(name,{gain=1,loop=false,rate=1}={}){
+    if(!this.enabled||this.paused||!this.context)return null;const family=AUDIO_FAMILIES[name],active=this.active.get(name)||new Set();if(!family||active.size>=family.limit)return null;const path=this.nextPath(name),buffer=this.buffers.get(path);if(!buffer)return null;
+    const source=this.context.createBufferSource(),voice=this.context.createGain(),pitch=family.pitch||0;source.buffer=buffer;source.loop=loop;source.playbackRate.value=rate*(1+(Math.random()*2-1)*pitch);voice.gain.value=family.gain*gain*(.96+Math.random()*.08);source.connect(voice).connect(this.master);active.add(source);this.active.set(name,active);source.onended=()=>{active.delete(source);source.disconnect();voice.disconnect()};source.start();return source;
+  }
+  playWhenReady(name,options){if(this.buffers.size)this.play(name,options);else this.preloadPromise?.then(()=>this.play(name,options))}
+  startAmbience(){if(this.ambience||!this.enabled||this.paused)return;this.ambience=this.play('graveAmbience',{loop:true});if(this.ambience)this.ambience.addEventListener?.('ended',()=>{this.ambience=null})}
+  updateGain(){if(!this.master)return;const target=this.enabled&&!this.paused ? 0.42 : 0;this.master.gain.cancelScheduledValues(this.context.currentTime);this.master.gain.setTargetAtTime(target,this.context.currentTime,.035);if(target>0)this.startAmbience()}
+  setPaused(paused){this.paused=paused;this.updateGain()}
+  toggle(){this.enabled=!this.enabled;this.updateGain();return this.enabled}
+  destroy(){this.active.forEach((sources)=>sources.forEach((source)=>{try{source.stop()}catch{}}));this.active.clear();this.context?.close?.();this.context=null}
 }
 
 export class Game {
@@ -60,17 +85,18 @@ export class Game {
     if(this.headless){this.renderer={dispose(){},render(){}};this.arena={pulse(){},setBell(){},applyLaws(){},update(){}}}
     else{this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.stage.appendChild(this.renderer.domElement);this.arena=buildArena(this.scene);this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2()}
     this.audio=new RitualAudio();this.clock=new THREE.Clock(false);this.elapsed=0;this.running=false;this.paused=false;this.modalPaused=false;this.ended=false;
-    this.units=[];this.enemies=[];this.treasures=[];this.effects=[];this.zones=[];this.deferred=[];this.selectedId=null;this.nextEntityId=1;this.nextCohortId=1;this.killCount=0;this.spawnWait=2.2*this.difficulty.spawnInterval;this.nextUpgrade=60;this.pendingTreasureDrops=0;this.hoverTreasureId=null;this.arrivalIndex=0;this.arrivalTimes=[240,480,720,960];this.lastHud=0;this.lastOmen=0;this.lastBell=0;this.appliedUpgradeIds=new Set();this.animationFrame=0;this.cameraShake=0;this.maxEnemies=Math.round(118*this.difficulty.capacity);this.currentEncounter=null;this.chronicle=loadChronicle();this.graveLaws=rollGraveLaws(2,options.lawIds);this.arena.applyLaws?.(this.graveLaws);
+    this.units=[];this.enemies=[];this.treasures=[];this.effects=[];this.zones=[];this.deferred=[];this.selectedId=null;this.nextEntityId=1;this.nextCohortId=1;this.killCount=0;this.spawnWait=2.2*this.difficulty.spawnInterval;this.upgradeDropIndex=0;this.nextUpgrade=UPGRADE_DROP_TIMES[0];this.pendingTreasureDrops=0;this.hoverTreasureId=null;this.arrivalIndex=0;this.arrivalTimes=[240,480,720,960];this.lastHud=0;this.lastOmen=0;this.lastBell=0;this.appliedUpgradeIds=new Set();this.animationFrame=0;this.cameraShake=0;this.maxEnemies=Math.round(118*this.difficulty.capacity);this.currentEncounter=null;this.chronicle=loadChronicle();this.graveLaws=rollGraveLaws(2,options.lawIds);this.arena.applyLaws?.(this.graveLaws);
     this.boundResize=()=>this.resize();this.boundTreasureMove=(event)=>this.handleTreasurePointer(event,false);this.boundTreasureClick=(event)=>this.handleTreasurePointer(event,true);this.boundTreasureLeave=()=>this.clearTreasureHover();if(!this.headless){window.addEventListener('resize',this.boundResize);this.renderer.domElement.addEventListener('pointermove',this.boundTreasureMove);this.renderer.domElement.addEventListener('click',this.boundTreasureClick);this.renderer.domElement.addEventListener('pointerleave',this.boundTreasureLeave);this.resize();this.render(0)}
   }
 
-  start(){if(this.running)return;if(!this.headless)this.audio.start();this.running=true;this.clock.start();let newLaw=false;this.graveLaws.forEach((law)=>{newLaw=discoverLaw(this.chronicle,law.id)||newLaw});this.addUnit(generateOathbound([],0),true);this.feed('The first oathbound answers.',true);this.graveLaws.forEach((law)=>this.feed(`<strong>${law.name}</strong> — ${law.text}`,true));if(newLaw)this.events.onDiscovery?.(this.snapshot());this.events.onStart?.();if(!this.headless)this.loop()}
-  destroy(){if(!this.headless){cancelAnimationFrame(this.animationFrame);window.removeEventListener('resize',this.boundResize);this.renderer.domElement.removeEventListener('pointermove',this.boundTreasureMove);this.renderer.domElement.removeEventListener('click',this.boundTreasureClick);this.renderer.domElement.removeEventListener('pointerleave',this.boundTreasureLeave)}this.renderer.dispose()}
+  start(){if(this.running)return;if(!this.headless){this.audio.start();this.audio.playWhenReady('ritualBell',{gain:.88})}this.running=true;this.clock.start();let newLaw=false;this.graveLaws.forEach((law)=>{newLaw=discoverLaw(this.chronicle,law.id)||newLaw});this.addUnit(generateOathbound([],0),true);this.feed('The first oathbound answers.',true);this.graveLaws.forEach((law)=>this.feed(`<strong>${law.name}</strong> — ${law.text}`,true));if(newLaw)this.events.onDiscovery?.(this.snapshot());this.events.onStart?.();if(!this.headless)this.loop()}
+  destroy(){if(!this.headless){cancelAnimationFrame(this.animationFrame);window.removeEventListener('resize',this.boundResize);this.renderer.domElement.removeEventListener('pointermove',this.boundTreasureMove);this.renderer.domElement.removeEventListener('click',this.boundTreasureClick);this.renderer.domElement.removeEventListener('pointerleave',this.boundTreasureLeave);this.audio.destroy()}this.renderer.dispose()}
   resize(){if(this.headless)return;const width=Math.max(1,this.stage.clientWidth);const height=Math.max(1,this.stage.clientHeight);this.renderer.setSize(width,height,false);const aspect=width/height;const vertical=18.4;this.camera.top=vertical/2;this.camera.bottom=-vertical/2;this.camera.left=-vertical*aspect/2;this.camera.right=vertical*aspect/2;this.camera.updateProjectionMatrix()}
-  togglePause(force){if(!this.running||this.ended||this.modalPaused)return this.paused;this.paused=typeof force==='boolean'?force:!this.paused;this.events.onPause?.(this.paused);return this.paused}
+  togglePause(force){if(!this.running||this.ended||this.modalPaused)return this.paused;this.paused=typeof force==='boolean'?force:!this.paused;this.audio.setPaused(this.paused);this.events.onPause?.(this.paused);return this.paused}
   setModalPaused(value){this.modalPaused=value}
   setDifficulty(level){if(this.running)return this.difficulty;this.difficultyLevel=clamp(Math.round(Number(level)||4),1,5);this.difficulty=DIFFICULTY_PRESETS[this.difficultyLevel-1];this.spawnWait=2.2*this.difficulty.spawnInterval;this.maxEnemies=Math.round(118*this.difficulty.capacity);return this.difficulty}
   toggleSound(){return this.audio.toggle()}
+  playUi(){if(this.headless)return;this.audio.start();this.audio.playWhenReady('uiParchment')}
   selectUnit(id){if(this.units.some((unit)=>unit.id===id)){this.selectedId=id;this.events.onRoster?.(this.snapshot())}}
 
   clearTreasureHover(){this.hoverTreasureId=null;this.treasures.forEach((treasure)=>treasure.hovered=false);if(!this.headless)this.renderer.domElement.style.cursor=''}
@@ -91,7 +117,7 @@ export class Game {
   }
 
   collectTreasure(treasure,carrier){
-    if(!treasure||treasure.state==='collected')return;treasure.state='collected';carrier.pickupTreasureId=null;carrier.vx=0;carrier.vy=0;carrier.aiState='Opening the blood book';this.selectedId=carrier.id;this.scene.remove(treasure.mesh);disposeTreasureVisual(treasure.mesh);this.treasures=this.treasures.filter((item)=>item!==treasure);this.effects.push(createParticleBurst(this.scene,carrier.x,carrier.y,0xe0b45c,24,1.5,'ritual'));this.effects.push(createBurst(this.scene,carrier.x,carrier.y,0xe0b45c,1.25,'ritual'));this.audio.bell(6);this.feed(`<strong>${carrier.name}</strong> claims the reliquary. The Blood Book opens.`,true);this.openUpgrade(carrier.id);
+    if(!treasure||treasure.state==='collected')return;treasure.state='collected';carrier.pickupTreasureId=null;carrier.vx=0;carrier.vy=0;carrier.aiState='Opening the blood book';this.selectedId=carrier.id;this.scene.remove(treasure.mesh);disposeTreasureVisual(treasure.mesh);this.treasures=this.treasures.filter((item)=>item!==treasure);this.effects.push(createParticleBurst(this.scene,carrier.x,carrier.y,0xe0b45c,24,1.5,'ritual'));this.effects.push(createBurst(this.scene,carrier.x,carrier.y,0xe0b45c,1.25,'ritual'));this.audio.play('reliquary');this.feed(`<strong>${carrier.name}</strong> claims the reliquary. The Blood Book opens.`,true);this.openUpgrade(carrier.id);
   }
 
   updateTreasures(dt){
@@ -103,7 +129,7 @@ export class Game {
     applyGraveLawsToHero(this.graveLaws,unit);
     unit.shield+=unit.maxHp*(initial?.18:.12);
     unit.mesh=createHeroVisual(unit);this.scene.add(unit.mesh);this.units.push(unit);if(!this.selectedId)this.selectedId=unit.id;const newOrigin=discoverOrigin(this.chronicle,unit.originId);this.events.onRoster?.(this.snapshot());if(newOrigin)this.events.onDiscovery?.(this.snapshot());
-    if(!initial){this.audio.bell(this.units.length);this.feed(`<strong>${unit.name}</strong>, ${unit.archetype}, arrives unbidden.`,true);this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd5a25c,18,1.4,'ritual'));this.effects.push(createBurst(this.scene,unit.x,unit.y,0xd5a25c,1.2,'ritual'))}
+    if(!initial){this.audio.play('ritualBell',{gain:.68});this.feed(`<strong>${unit.name}</strong>, ${unit.archetype}, arrives unbidden.`,true);this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd5a25c,18,1.4,'ritual'));this.effects.push(createBurst(this.scene,unit.x,unit.y,0xd5a25c,1.2,'ritual'))}
     return unit;
   }
 
@@ -120,7 +146,7 @@ export class Game {
   }
 
   triggerEncounter(encounter){
-    if(!encounter||this.enemies.length+encounter.types.length>this.maxEnemies)return;const spawned=this.spawnPack(encounter,true);this.spawnWait=Math.max(this.spawnWait,5.5);this.currentEncounter={id:`minute-${encounter.minute}`,title:encounter.title,sigil:encounter.sigil,omen:encounter.omen,time:8};discoverEncounter(this.chronicle,this.currentEncounter.id);this.feed(`<strong>${encounter.title}</strong> — ${encounter.omen}`,true);this.events.onEncounter?.(this.currentEncounter,spawned);this.events.onDiscovery?.(this.snapshot());this.cameraShake=Math.max(this.cameraShake,.24);this.audio.bell(encounter.minute+4);
+    if(!encounter||this.enemies.length+encounter.types.length>this.maxEnemies)return;const spawned=this.spawnPack(encounter,true);this.spawnWait=Math.max(this.spawnWait,5.5);this.currentEncounter={id:`minute-${encounter.minute}`,title:encounter.title,sigil:encounter.sigil,omen:encounter.omen,time:8};discoverEncounter(this.chronicle,this.currentEncounter.id);this.feed(`<strong>${encounter.title}</strong> — ${encounter.omen}`,true);this.events.onEncounter?.(this.currentEncounter,spawned);this.events.onDiscovery?.(this.snapshot());this.cameraShake=Math.max(this.cameraShake,.24);this.audio.play('ritualBell',{gain:.82});
   }
 
   loop(){this.animationFrame=requestAnimationFrame(()=>this.loop());const dt=Math.min(.05,this.clock.getDelta());if(this.running&&!this.paused&&!this.modalPaused&&!this.ended)this.update(dt);this.render(performance.now())}
@@ -139,9 +165,9 @@ export class Game {
         unit.ap=Math.min(unit.maxAp,unit.ap+unit.maxAp*(.3+(benediction?.ap||0)));
         this.effects.push(createBurst(this.scene,unit.x,unit.y,benediction?0xe0b45c:0xd5a25c,benediction ? .6 : .42));
       });
-      this.audio.bell(bell);this.arena.pulse?.(bell);this.arena.setBell?.(bell);this.feed(benediction?`<strong>${benediction.title}</strong> — ${benediction.omen}`:'The bell rekindles every unbroken oath.',!!benediction);this.triggerEncounter(getBellEncounter(bell));if(benediction)this.events.onMilestone?.(benediction,this.snapshot());
+      this.audio.play('ritualBell',{gain:benediction?1:.78});this.arena.pulse?.(bell);this.arena.setBell?.(bell);this.feed(benediction?`<strong>${benediction.title}</strong> — ${benediction.omen}`:'The bell rekindles every unbroken oath.',!!benediction);this.triggerEncounter(getBellEncounter(bell));if(benediction)this.events.onMilestone?.(benediction,this.snapshot());
     }
-    while(this.elapsed>=this.nextUpgrade&&this.nextUpgrade<TOTAL_TIME){this.pendingTreasureDrops+=1;this.nextUpgrade+=60;this.feed('A graveborn somewhere in the procession now carries an open reliquary.',true)}
+    while(this.upgradeDropIndex<UPGRADE_DROP_TIMES.length&&this.elapsed>=this.nextUpgrade){this.pendingTreasureDrops+=1;this.upgradeDropIndex+=1;this.nextUpgrade=UPGRADE_DROP_TIMES[this.upgradeDropIndex]??Infinity;this.feed('A graveborn somewhere in the procession now carries an open reliquary.',true)}
     this.updateDeferred(dt);this.updateZones(dt);this.updateTreasures(dt);this.updateHeroes(dt);if(!this.modalPaused)this.updateEnemies(dt);this.updateEffects(dt);this.cleanup();
     if(!this.units.some((unit)=>unit.alive)){this.end(false);return}
     if(this.elapsed-this.lastHud>.1){this.lastHud=this.elapsed;this.events.onHud?.(this.snapshot())}
@@ -161,7 +187,7 @@ export class Game {
       unit.ap-=cost;ability.cooldownLeft=ability.cooldown*unit.mods.cooldown;unit.abilityCursor=(unit.abilityCursor+1)%unit.abilities.length;unit.casts+=1;unit.lastAbilityKind=ability.kind;unit.lastAbilityCategory=ability.category||ability.kind;unit.mesh.userData.castPulse=1;
       if(unit.mods.barrierPerCast>0)unit.shield+=unit.mods.barrierPerCast;if(unit.mods.healEvery&&unit.casts%unit.mods.healEvery===0)this.heal(unit,unit.maxHp*unit.mods.healEveryPower,false);
       if(Math.random()<unit.mods.echoChance)this.deferred.push({timer:.12,type:'echo',unitId:unit.id,ability,slot,power:unit.mods.echoPower});
-      this.audio.tone(SUPPORT_KINDS.has(ability.kind)?330:MELEE_KINDS.has(ability.kind)?155:215,.1,.05,SUPPORT_KINDS.has(ability.kind)?'sine':'triangle',MELEE_KINDS.has(ability.kind)?1.5:.65);
+      this.audio.play(SUPPORT_KINDS.has(ability.kind)?'supportWard':MELEE_KINDS.has(ability.kind)?'meleeRelease':'arcaneRelease');
     }
   }
 
@@ -184,7 +210,7 @@ export class Game {
     if(ability.kind==='heal'||ability.kind==='ward'||ability.kind==='transfusion'){
       const ally=chooseSupportTarget(unit,allies);if(!ally||distance(unit,ally)>abilityTacticalRange(unit,ability))return false;
       if(ability.kind==='heal'){this.heal(ally,ability.power*unit.mods.healing*powerScale,true);this.effects.push(createParticleBurst(this.scene,ally.x,ally.y,ability.color,10,.75,'heal'))}
-      if(ability.kind==='ward'){const amount=ability.power*unit.mods.ward*powerScale;ally.shield+=amount;this.effects.push(createBurst(this.scene,ally.x,ally.y,ability.color,.7,'heal'));this.effects.push(createFloatingText(this.scene,`+${Math.round(amount)} WARD`,ally.x,ally.y,'#8f9bcc'));this.audio.ward()}
+      if(ability.kind==='ward'){const amount=ability.power*unit.mods.ward*powerScale;ally.shield+=amount;this.effects.push(createBurst(this.scene,ally.x,ally.y,ability.color,.7,'heal'));this.effects.push(createFloatingText(this.scene,`+${Math.round(amount)} WARD`,ally.x,ally.y,'#8f9bcc'))}
       if(ability.kind==='transfusion'){const payment=Math.min(unit.hp-1,Math.max(3,unit.maxHp*.055));unit.hp-=Math.max(0,payment);this.heal(ally,ability.power*unit.mods.healing*powerScale+payment*.8,true);ally.status.haste=Math.max(ally.status.haste||0,2.8);this.effects.push(createBeam(this.scene,unit,ally,ability.color,.4))}
       unit.mods.afterSupportReady=true;return true;
     }
@@ -246,7 +272,7 @@ export class Game {
   updateDeferred(dt){
     for(const action of this.deferred){action.timer-=dt;action.telegraph?.update?.(dt,action)}
     const ready=this.deferred.filter((action)=>action.timer<=0);this.deferred=this.deferred.filter((action)=>action.timer>0);
-    ready.forEach((action)=>{const unit=this.units.find((item)=>item.id===action.unitId&&item.alive);if(action.type==='echo'&&unit)this.cast(unit,action.ability,action.slot,action.power,true);if(action.type==='blast'){action.telegraph?.destroy?.();this.enemies.filter((enemy)=>enemy.alive&&distance(enemy,action)<=action.radius).forEach((enemy)=>this.damageEnemy(enemy,action.power,unit,Math.random()<.08));this.effects.push(createParticleBurst(this.scene,action.x,action.y,action.color,28,action.radius,'shockwave'));this.effects.push(createBurst(this.scene,action.x,action.y,action.color,action.radius/2,'shockwave'));this.cameraShake=Math.max(this.cameraShake,.22);this.audio.bell(3)}});
+    ready.forEach((action)=>{const unit=this.units.find((item)=>item.id===action.unitId&&item.alive);if(action.type==='echo'&&unit)this.cast(unit,action.ability,action.slot,action.power,true);if(action.type==='blast'){action.telegraph?.destroy?.();this.enemies.filter((enemy)=>enemy.alive&&distance(enemy,action)<=action.radius).forEach((enemy)=>this.damageEnemy(enemy,action.power,unit,Math.random()<.08));this.effects.push(createParticleBurst(this.scene,action.x,action.y,action.color,28,action.radius,'shockwave'));this.effects.push(createBurst(this.scene,action.x,action.y,action.color,action.radius/2,'shockwave'));this.cameraShake=Math.max(this.cameraShake,.22);this.audio.play('combatImpact',{gain:1.12})}});
   }
 
   updateOrbit(unit,dt,enemies){
@@ -258,7 +284,7 @@ export class Game {
     if(!enemy?.alive||amount<=0)return 0;if(enemy.dodge>0&&Math.random()<enemy.dodge){if(!flags.quiet){this.effects.push(createFloatingText(this.scene,'HOLLOW',enemy.x,enemy.y,'#8e9dc9'));this.effects.push(createAfterimage(this.scene,enemy.x,enemy.y,'#707faa'))}return 0}
     const armorFactor=enemy.template.armored&&enemy.status.armorBreak<=0?.86:1;amount*=armorFactor;const linked=enemy.linkedGuard>0&&this.enemies.some((other)=>other!==enemy&&other.alive&&other.linkedGuard>0&&distance(enemy,other)<(enemy.affixAuraRadius||3.5));if(linked)amount*=1-enemy.linkedGuard;const cohortLeader=enemy.cohortLeaderId&&enemy.cohortLeaderId!==enemy.id?this.enemies.find((other)=>other.alive&&other.id===enemy.cohortLeaderId&&distance(enemy,other)<3.4):null;if(cohortLeader)amount*=.93;const closeExposure=source&&distance(source,enemy)<1.8?source.mods.closeGuard:0;amount*=1+closeExposure;
     let remaining=amount;if(enemy.shield>0){const absorbed=Math.min(enemy.shield,remaining);enemy.shield-=absorbed;remaining-=absorbed}enemy.hp-=remaining;if(enemy.wardOnHit>0&&enemy.alive&&enemy.wardHitCooldown<=0){enemy.shield+=enemy.maxHp*enemy.wardOnHit;enemy.wardHitCooldown=.72}
-    if(source?.mods?.lifesteal)this.heal(source,remaining*source.mods.lifesteal,false);if(!flags.quiet)this.effects.push(createFloatingText(this.scene,`${critical?'✧ ':''}${Math.round(remaining)}`,enemy.x,enemy.y,critical?'#f0b85f':'#dfd4bf'));
+    if(source?.mods?.lifesteal)this.heal(source,remaining*source.mods.lifesteal,false);if(!flags.quiet){this.effects.push(createFloatingText(this.scene,`${critical?'✧ ':''}${Math.round(remaining)}`,enemy.x,enemy.y,critical?'#f0b85f':'#dfd4bf'));this.audio.play('combatImpact',{gain:critical?1.15:1})}
     if(source&&enemy.hp/enemy.maxHp<=source.mods.execute)enemy.hp=0;if(enemy.hp<=0)this.killEnemy(enemy,source);
     return remaining;
   }
@@ -272,7 +298,7 @@ export class Game {
     if(enemy.template.splits){for(let i=0;i<enemy.template.splits;i+=1){const angle=i/enemy.template.splits*Math.PI*2;this.spawnEnemy('thrall',{x:enemy.x+Math.cos(angle)*.45,y:enemy.y+Math.sin(angle)*.45},[])}}
     if(this.pendingTreasureDrops>0){this.pendingTreasureDrops-=1;this.spawnTreasure(enemy.x,enemy.y)}
     if(enemy.elite)this.feed(`<strong>${enemy.name}</strong> is broken.`,true);
-    this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0xb8aa95,8,.8));this.effects.push(createBurst(this.scene,enemy.x,enemy.y,0xb74147,.9));this.effects.push(createCorpseDecal(this.scene,enemy.x,enemy.y,enemy.type));this.audio.tone(72,.12,.055,'sawtooth');
+    this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0xb8aa95,8,.8));this.effects.push(createBurst(this.scene,enemy.x,enemy.y,0xb74147,.9));this.effects.push(createCorpseDecal(this.scene,enemy.x,enemy.y,enemy.type));this.audio.play('skeletonDeath',{gain:enemy.template.giant?1.24:1});
   }
 
   heal(unit,amount,show=true){if(!unit?.alive||amount<=0)return;const missing=Math.max(0,unit.maxHp-unit.hp);const actual=Math.min(amount,missing);const overflow=Math.max(0,amount-actual);unit.hp=Math.min(unit.maxHp,unit.hp+amount);if(overflow>0&&unit.mods.overhealWard>0)unit.shield+=overflow*unit.mods.overhealWard;if(show&&actual>.2)this.effects.push(createFloatingText(this.scene,`+${Math.round(actual)}`,unit.x,unit.y,'#e3d89f'))}
@@ -305,35 +331,35 @@ export class Game {
   }
 
   enemyAttack(enemy,target){
+    this.audio.play(enemy.template.ranged?'enemyBow':'enemyBlade',{gain:enemy.template.giant?1.18:1});
     let victims=1;if(enemy.template.cleave){const struck=this.units.filter((unit)=>unit.alive&&distance(enemy,unit)<enemy.range+1);victims=struck.length;struck.forEach((unit)=>this.damageHero(unit,enemy.damage,enemy));this.effects.push(createSlashArc(this.scene,enemy.x,enemy.y,0xb09a7d,2,Math.PI*1.5));this.cameraShake=Math.max(this.cameraShake,.12)}
     else {this.damageHero(target,enemy.damage,enemy);if(enemy.template.ranged){if(enemy.template.bishop)this.effects.push(createBeam(this.scene,enemy,target,0xa77ab2,.35));else this.effects.push(createProjectile(this.scene,enemy,target,0xbdb2a0,.07))}else this.effects.push(createSlashArc(this.scene,target.x,target.y,0x9e2d33,.75,Math.PI*.7))}
     if(enemy.lifeSteal>0)enemy.hp=Math.min(enemy.maxHp,enemy.hp+enemy.damage*enemy.lifeSteal*Math.max(1,victims*.7));
-    this.audio.tone(enemy.template.giant?62:86,.08,enemy.template.giant?.05:.026,'square');
   }
 
   damageHero(unit,amount,source){
     if(!unit.alive)return;
     if(Math.random()<unit.mods.dodgeChance){this.effects.push(createFloatingText(this.scene,'EVADE',unit.x,unit.y,'#b8c5c1'));this.effects.push(createAfterimage(this.scene,unit.x,unit.y,unit.color));return}
-    if(unit.status.riposte>0&&source?.alive&&distance(unit,source)<2){unit.status.riposte=0;amount*=.35;this.damageEnemy(source,unit.status.ripostePower||18,unit,true);this.effects.push(createSlashArc(this.scene,unit.x,unit.y,0xe45c5d,1.35,Math.PI*1.2));this.audio.blade()}
+    if(unit.status.riposte>0&&source?.alive&&distance(unit,source)<2){unit.status.riposte=0;amount*=.35;this.damageEnemy(source,unit.status.ripostePower||18,unit,true);this.effects.push(createSlashArc(this.scene,unit.x,unit.y,0xe45c5d,1.35,Math.PI*1.2));this.audio.play('meleeRelease',{gain:1.15})}
     if(distance(unit,source)<1.9&&unit.mods.closeGuard)amount*=Math.max(.7,1-unit.mods.closeGuard);
     const shieldBefore=unit.shield;let remaining=amount;
     if(unit.shield>0){const absorbed=Math.min(unit.shield,remaining);unit.shield-=absorbed;remaining-=absorbed}
     unit.hp-=remaining;
     if(shieldBefore>0&&unit.shield<=0&&unit.mods.wardBreakNova>0){const retaliation=unit.maxHp*unit.mods.wardBreakNova;this.enemies.filter((enemy)=>enemy.alive&&distance(unit,enemy)<2.4).forEach((enemy)=>this.damageEnemy(enemy,retaliation,unit,false));this.effects.push(createBurst(this.scene,unit.x,unit.y,0x8d95b5,1.6))}
     if(unit.mods.thorns>0&&source.alive){source.hp-=amount*unit.mods.thorns;if(source.hp<=0)this.killEnemy(source,unit)}
-    this.effects.push(createFloatingText(this.scene,`−${Math.round(amount)}`,unit.x,unit.y,'#df5555'));this.effects.push(createHitSpark(this.scene,unit.x,unit.y,0xd94a4e,1));this.cameraShake=Math.max(this.cameraShake,.045);
+    this.effects.push(createFloatingText(this.scene,`−${Math.round(amount)}`,unit.x,unit.y,'#df5555'));this.effects.push(createHitSpark(this.scene,unit.x,unit.y,0xd94a4e,1));this.cameraShake=Math.max(this.cameraShake,.045);this.audio.play(remaining>0?'heroWound':'combatImpact',{gain:remaining>0?1:.75});
     if(unit.hp<=0){unit.alive=false;unit.hp=0;unit.mesh.visible=false;this.feed(`<strong>${unit.name}</strong> is taken by the grave.`,true);this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0x8f2b35,20,1.5));const survivors=this.units.filter((ally)=>ally.alive);survivors.forEach((ally)=>{ally.shield+=ally.maxHp*.07;ally.ap=Math.min(ally.maxAp,ally.ap+ally.maxAp*.18);this.effects.push(createBurst(this.scene,ally.x,ally.y,0xd5a25c,.55))});if(survivors.length)this.feed('The remaining oaths tighten around the empty name.');this.events.onRoster?.(this.snapshot());const next=survivors[0];if(next)this.selectedId=next.id}
   }
 
   updateEffects(dt){this.effects=this.effects.filter((effect)=>{if(effect.update(dt)){effect.destroy();return false}return true})}
   cleanup(){this.enemies=this.enemies.filter((enemy)=>{if(enemy.alive)return true;this.scene.remove(enemy.mesh);enemy.mesh.traverse((child)=>{child.geometry?.dispose?.();if(child.material){if(Array.isArray(child.material))child.material.forEach((material)=>material.dispose());else child.material.dispose()}});return false})}
 
-  openUpgrade(carrierId=null){if(carrierId)this.selectedId=carrierId;this.modalPaused=true;const minimum=this.elapsed>900?1:0;const choices=getUpgradeChoices(3,minimum);this.events.onUpgrade?.(choices,this.snapshot());this.feed('A page tears itself from the claimed reliquary.',true)}
-  applyUpgrade(upgrade,unitId){const unit=this.units.find((item)=>item.id===unitId&&item.alive);if(!unit)return null;upgrade.apply(unit);unit.hp=Math.min(unit.maxHp,unit.hp+unit.maxHp*.1);unit.shield+=unit.maxHp*.04;unit.ap=Math.min(unit.maxAp,unit.ap+unit.maxAp*.25);this.appliedUpgradeIds.add(upgrade.id);discoverRite(this.chronicle,upgrade.id);this.selectedId=unit.id;this.audio.bell(upgrade.rarity+2);this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd6504f,20,1.5,'ritual'));this.feed(`<strong>${unit.name}</strong> receives ${upgrade.shortName}; the binding rekindles flesh, ward, and will.`,true);const snapshot=this.snapshot();this.events.onRoster?.(snapshot);this.events.onHud?.(snapshot);this.events.onDiscovery?.(snapshot);return unit}
+  openUpgrade(carrierId=null){if(carrierId)this.selectedId=carrierId;this.modalPaused=true;const choices=getUpgradeChoices(3,{progress:this.elapsed/TOTAL_TIME});this.events.onUpgrade?.(choices,this.snapshot());this.feed('A page tears itself from the claimed reliquary.',true)}
+  applyUpgrade(upgrade,unitId){const unit=this.units.find((item)=>item.id===unitId&&item.alive);if(!unit)return null;upgrade.apply(unit);unit.hp=Math.min(unit.maxHp,unit.hp+unit.maxHp*.1);unit.shield+=unit.maxHp*.04;unit.ap=Math.min(unit.maxAp,unit.ap+unit.maxAp*.25);this.appliedUpgradeIds.add(upgrade.id);discoverRite(this.chronicle,upgrade.id);this.selectedId=unit.id;this.audio.play('upgradeBinding');this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd6504f,20,1.5,'ritual'));this.feed(`<strong>${unit.name}</strong> receives ${upgrade.shortName}; the binding rekindles flesh, ward, and will.`,true);const snapshot=this.snapshot();this.events.onRoster?.(snapshot);this.events.onHud?.(snapshot);this.events.onDiscovery?.(snapshot);return unit}
   reorderAbility(unitId,from,to){const unit=this.units.find((item)=>item.id===unitId);if(!unit||to<0||to>=unit.abilities.length)return null;const current=unit.abilities[unit.abilityCursor],[ability]=unit.abilities.splice(from,1);unit.abilities.splice(to,0,ability);unit.abilityCursor=Math.max(0,unit.abilities.indexOf(current));this.events.onRoster?.(this.snapshot());return unit}
   resumeAfterUpgrade(){this.modalPaused=false}
   feed(message,important=false){this.events.onFeed?.(message,important)}
-  end(victory){if(this.ended)return;this.ended=true;this.running=false;this.audio.bell(victory?12:0);const result={victory,kills:this.killCount,upgrades:this.appliedUpgradeIds.size,units:this.units.filter((unit)=>unit.alive).length,elapsed:this.elapsed,difficulty:this.difficultyLevel,lawIds:this.graveLaws.map((law)=>law.id)};recordRun(this.chronicle,result);this.events.onDiscovery?.(this.snapshot());this.events.onEnd?.({...result,chronicle:this.chronicle})}
+  end(victory){if(this.ended)return;this.ended=true;this.running=false;this.audio.play(victory?'ritualBell':'heroWound',{gain:1.25,rate:victory ? 0.92 : 0.82});const result={victory,kills:this.killCount,upgrades:this.appliedUpgradeIds.size,units:this.units.filter((unit)=>unit.alive).length,elapsed:this.elapsed,difficulty:this.difficultyLevel,lawIds:this.graveLaws.map((law)=>law.id)};recordRun(this.chronicle,result);this.events.onDiscovery?.(this.snapshot());this.events.onEnd?.({...result,chronicle:this.chronicle})}
   snapshot(){
     const progress=clamp(this.elapsed/TOTAL_TIME,0,1),pressureProgress=acceleratedPressure(progress),livingEnemies=this.enemies.filter((enemy)=>enemy.alive),windups=livingEnemies.filter((enemy)=>enemy.attackWindup>0);
     return{elapsed:this.elapsed,remaining:Math.max(0,TOTAL_TIME-this.elapsed),progress,pressureProgress,bell:Math.min(20,Math.floor(this.elapsed/60)+1),kills:this.killCount,selectedId:this.selectedId,paused:this.paused,upgradeCount:this.appliedUpgradeIds.size,codexSize:UPGRADE_CATALOG.length,abilityCount:24,originCount:12,enemyArchetypes:Object.keys(ENEMY_ARCHETYPES).length,enemyAffixes:ENEMY_AFFIXES.length,graveLawCount:GRAVE_LAWS.length,graveLaws:this.graveLaws,difficulty:this.difficultyLevel,difficultyName:this.difficulty.name,threat:Math.min(7,Math.floor(pressureProgress*7)+1),enemyCount:livingEnemies.length,eliteCount:livingEnemies.filter((enemy)=>enemy.elite).length,meleeIntents:windups.filter((enemy)=>!enemy.template.ranged).length,rangedIntents:windups.filter((enemy)=>enemy.template.ranged).length,supportCount:livingEnemies.filter((enemy)=>enemy.template.aura||enemy.template.bishop||enemy.template.standard).length,zoneCount:this.zones.length,treasureCount:this.treasures.length,pendingTreasureDrops:this.pendingTreasureDrops,currentEncounter:this.currentEncounter,chronicle:this.chronicle,units:this.units}

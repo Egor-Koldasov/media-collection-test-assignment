@@ -176,11 +176,28 @@ export const UPGRADE_CATALOG = blueprints.flatMap((blueprint, artIndex) =>
   })))
 );
 
-export function getUpgradeChoices(count = 3, minimumRarity = 0) {
-  const pool = UPGRADE_CATALOG.filter((upgrade) => upgrade.rarity >= minimumRarity);
+export function getUpgradeRarityProfile(progress = 0) {
+  const value=Math.max(0,Math.min(1,progress));
+  if(value<.2)return {label:'Whispered',weights:{1:1}};
+  if(value<.45)return {label:'Inscribed',weights:{1:.18,2:.82}};
+  if(value<.7)return {label:'Graven',weights:{2:.22,3:.78}};
+  if(value<.88)return {label:'Deep Graven',weights:{3:.35,4:.65}};
+  return {label:'Sovereign',weights:{4:1}};
+}
+
+function weightedRarity(weights) {
+  const entries=Object.entries(weights),roll=Math.random()*entries.reduce((sum,[,weight])=>sum+weight,0);let cursor=0;
+  for(const [rarity,weight] of entries){cursor+=weight;if(roll<=cursor)return Number(rarity)}
+  return Number(entries.at(-1)[0]);
+}
+
+export function getUpgradeChoices(count = 3, progression = {progress:0}) {
+  const legacyMinimum=typeof progression==='number'?progression:null,rarity=legacyMinimum===null?weightedRarity(getUpgradeRarityProfile(progression.progress).weights):null;
+  const pool = UPGRADE_CATALOG.filter((upgrade) => legacyMinimum===null?upgrade.rarity===rarity:upgrade.rarity>=legacyMinimum);
   const result = [];
   while (result.length < count) {
-    const choice = pick(pool);
+    const unusedFamilies=pool.filter((upgrade)=>!result.some((item)=>item.family===upgrade.family));
+    const choice = pick(unusedFamilies.length?unusedFamilies:pool);
     if (!result.some((item) => item.id === choice.id)) result.push(choice);
   }
   return result;

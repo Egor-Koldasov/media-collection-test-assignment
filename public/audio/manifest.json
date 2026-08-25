@@ -1,0 +1,79 @@
+{
+  "provider": "ElevenLabs Sound Effects",
+  "generatedOn": "2026-08-24",
+  "format": "MP3, 48 kHz stereo, 192 kbps",
+  "curation": "Four variants auditioned per family; variants 1-3 retained.",
+  "families": {
+    "graveAmbience": {
+      "duration": 20.04,
+      "loop": true,
+      "files": ["grave-ambience-01.mp3", "grave-ambience-02.mp3", "grave-ambience-03.mp3"],
+      "prompt": "Seamless dark-fantasy grave cloister ambience: cold wind in ruined arches, distant chain, stone dust, candles, and ossuary settling; exactly 20 seconds, perfectly loopable; no music, speech, combat, or bell."
+    },
+    "ritualBell": {
+      "duration": 3.24,
+      "files": ["ritual-bell-01.mp3", "ritual-bell-02.mp3", "ritual-bell-03.mp3"],
+      "prompt": "One cracked bronze cathedral bell strike in a ruined cloister; textured onset, mournful low-mid body, controlled decay; exactly 3.2 seconds; no music or second strike."
+    },
+    "meleeRelease": {
+      "duration": 0.72,
+      "files": ["melee-release-01.mp3", "melee-release-02.mp3", "melee-release-03.mp3"],
+      "prompt": "Hero longsword release through heavy night air with leather and cloth detail; exactly 0.7 seconds; no impact, voice, or magic."
+    },
+    "arcaneRelease": {
+      "duration": 1.104,
+      "files": ["arcane-release-01.mp3", "arcane-release-02.mp3", "arcane-release-03.mp3"],
+      "prompt": "Violet sigil bolt release with glassy grit, ash hiss, and spectral tail; exactly 1.1 seconds; no impact, thunder, voice, or laser."
+    },
+    "supportWard": {
+      "duration": 1.32,
+      "files": ["support-ward-01.mp3", "support-ward-02.mp3", "support-ward-03.mp3"],
+      "prompt": "Protective oath ward from etched silver, chain movement, reversed air, and mineral shimmer; exactly 1.3 seconds; no choir, speech, or cartoon sparkle."
+    },
+    "enemyBlade": {
+      "duration": 0.72,
+      "files": ["enemy-blade-01.mp3", "enemy-blade-02.mp3", "enemy-blade-03.mp3"],
+      "prompt": "Skeleton cleaver or chipped sword release with rust scrape and loose bone joints; exactly 0.7 seconds; no impact or voice."
+    },
+    "enemyBow": {
+      "duration": 0.912,
+      "files": ["enemy-bow-01.mp3", "enemy-bow-02.mp3", "enemy-bow-03.mp3"],
+      "prompt": "Skeleton archer release with sinew string, old yew creak, and bone-fletched arrow hiss; exactly 0.9 seconds; no impact or firearm tone."
+    },
+    "combatImpact": {
+      "duration": 0.624,
+      "files": ["combat-impact-01.mp3", "combat-impact-02.mp3", "combat-impact-03.mp3"],
+      "prompt": "Compact iron, leather, brittle bone, and cloth combat impact with muted stone reflection; exactly 0.6 seconds; no swing, scream, or explosion."
+    },
+    "skeletonDeath": {
+      "duration": 1.032,
+      "files": ["skeleton-death-01.mp3", "skeleton-death-02.mp3", "skeleton-death-03.mp3"],
+      "prompt": "Skeleton collapse onto flagstones with ribs, limb bones, skull knock, and dust; exactly 1 second; no gore, voice, or comedy."
+    },
+    "heroWound": {
+      "duration": 0.84,
+      "files": ["hero-wound-01.mp3", "hero-wound-02.mp3", "hero-wound-03.mp3"],
+      "prompt": "Armored cloth, leather straps, restrained plate knock, and heavy body recoil; exactly 0.8 seconds; no vocalization, gore, or music."
+    },
+    "reliquary": {
+      "duration": 1.632,
+      "files": ["reliquary-01.mp3", "reliquary-02.mp3", "reliquary-03.mp3"],
+      "prompt": "Small iron-bound reliquary latch and wood hinge followed by mineral ember light from within; exactly 1.6 seconds; no coins, fanfare, or mobile-game chime."
+    },
+    "upgradeBinding": {
+      "duration": 2.232,
+      "files": ["upgrade-binding-01.mp3", "upgrade-binding-02.mp3", "upgrade-binding-03.mp3"],
+      "prompt": "Parchment seal, rotating metal tokens, wax, oath rune, mineral pulse, and ash; exactly 2.2 seconds; no choir, melody, or explosion."
+    },
+    "uiParchment": {
+      "duration": 0.504,
+      "files": ["ui-parchment-01.mp3", "ui-parchment-02.mp3", "ui-parchment-03.mp3"],
+      "prompt": "Tiny dry paper slip, restrained brass stylus tick, and faint wax touch; exactly 0.5 seconds; no chime, digital beep, or whoosh."
+    }
+  },
+  "retries": [
+    "Ritual bell prompt shortened once after the provider rejected text over 450 characters; no credits charged for the rejected request.",
+    "Reliquary and grave-ambience prompts were shortened before submission to satisfy the same provider text limit.",
+    "No format conversion or gain processing was applied."
+  ]
+}

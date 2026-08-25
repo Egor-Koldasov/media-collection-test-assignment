@@ -21,19 +21,20 @@ function disposeObject(object){object?.traverse?.((child)=>{child.geometry?.disp
 
 const atlasTextureCache=new Map();
 const enemyArtOrder=['thrall','hound','pikeman','bowman','harvester','graveguard','cantor','standard','wraith','bishop','ossuary','giant'];
+const originArtOrder=['bone-orchard','bell-orphan','red-parish','moth-witness','salt-pilgrim','last-courier','choir-exile','grave-gardener','iron-votary','black-star','wolf-gate','candle-child'];
 const enemyFacingProfiles={
-  thrall:{native:-1,tracksTarget:false},
-  hound:{native:-1,tracksTarget:false},
-  pikeman:{native:-1,tracksTarget:false},
-  bowman:{native:1,tracksTarget:true},
-  harvester:{native:-1,tracksTarget:false},
-  graveguard:{native:-1,tracksTarget:false},
-  cantor:{native:1,tracksTarget:true},
-  standard:{native:-1,tracksTarget:true},
-  wraith:{native:1,tracksTarget:false},
-  bishop:{native:1,tracksTarget:true},
-  ossuary:{native:-1,tracksTarget:false},
-  giant:{native:-1,tracksTarget:false}
+  thrall:{native:-1},
+  hound:{native:-1},
+  pikeman:{native:-1},
+  bowman:{native:1},
+  harvester:{native:-1},
+  graveguard:{native:-1},
+  cantor:{native:1},
+  standard:{native:-1},
+  wraith:{native:1},
+  bishop:{native:1},
+  ossuary:{native:-1},
+  giant:{native:-1}
 };
 
 function atlasTexture(path){
@@ -76,9 +77,9 @@ function animatedAtlasPlane(path,columns,rows,frameCell,opacity=1){
 }
 
 function rigidAtlasPlane(path,columns,rows){
-  const uniforms={uMap:{value:atlasTexture(path)},uAtlas:{value:new THREE.Vector2(columns,rows)},uCell:{value:new THREE.Vector2(0,rows-1)},uTint:{value:new THREE.Color(0xffffff)}};
-  const material=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`varying vec2 vUv;uniform sampler2D uMap;uniform vec2 uAtlas;uniform vec2 uCell;uniform vec3 uTint;void main(){vec4 painted=texture2D(uMap,(vUv+uCell)/uAtlas);if(painted.a<.025)discard;gl_FragColor=vec4(painted.rgb*uTint,painted.a);}`});
-  const sprite=new THREE.Mesh(new THREE.PlaneGeometry(1,1),material);sprite.userData.animationFrame=-1;sprite.userData.setAnimationFrame=(frame)=>{const next=Math.max(0,Math.min(columns*rows-1,frame));if(sprite.userData.animationFrame===next)return;uniforms.uCell.value.set(next%columns,rows-Math.floor(next/columns)-1);sprite.userData.animationFrame=next};sprite.userData.setAnimationFrame(0);return sprite;
+  const uniforms={uMap:{value:atlasTexture(path)},uAtlas:{value:new THREE.Vector2(columns,rows)},uCell:{value:new THREE.Vector2(0,rows-1)},uTint:{value:new THREE.Color(0xffffff)},uOpacity:{value:1}};
+  const material=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`varying vec2 vUv;uniform sampler2D uMap;uniform vec2 uAtlas;uniform vec2 uCell;uniform vec3 uTint;uniform float uOpacity;void main(){vec4 painted=texture2D(uMap,(vUv+uCell)/uAtlas);if(painted.a<.025)discard;gl_FragColor=vec4(painted.rgb*uTint,painted.a*uOpacity);}`});
+  const sprite=new THREE.Mesh(new THREE.PlaneGeometry(1,1),material);sprite.userData.animationFrame=-1;sprite.userData.setAnimationFrame=(frame)=>{const next=Math.max(0,Math.min(columns*rows-1,frame));if(sprite.userData.animationFrame===next)return;uniforms.uCell.value.set(next%columns,rows-Math.floor(next/columns)-1);sprite.userData.animationFrame=next};sprite.userData.setOpacity=(opacity)=>{uniforms.uOpacity.value=opacity};sprite.userData.setAnimationFrame(0);return sprite;
 }
 
 function prepareDepthSortedVisual(group){
@@ -160,33 +161,8 @@ export function buildArena(scene){
 function makeBar(width,color){const holder=new THREE.Group();const bg=plane(width,.06,flat(0x050609,.88));const fill=plane(width,.044,flat(color));fill.position.z=.01;holder.add(bg,fill);holder.userData.bg=bg;holder.userData.fill=fill;holder.userData.width=width;return holder}
 
 function createOriginRelic(unit){
-  const relic=new THREE.Group(),color=unit.originColor||0xd2a65e,add=(...objects)=>{objects.forEach((object)=>relic.add(object));return relic};relic.position.z=.24;
-  if(unit.originId==='bone-orchard'){
-    const left=line([[-.1,.47,0],[-.28,.72,0],[-.4,.77,0],[-.29,.7,0],[-.35,.88,0]],color,.78),right=line([[.1,.47,0],[.28,.72,0],[.4,.77,0],[.29,.7,0],[.35,.88,0]],color,.78);add(left,right);
-  }else if(unit.originId==='bell-orphan'){
-    const bell=polygon([[-.1,.02],[.1,.02],[.15,-.18],[-.15,-.18]],color,.9),clapper=circle(.028,flat(0xead6a7,.9),8);bell.position.set(-.28,-.25,0);clapper.position.set(-.28,-.46,.01);add(bell,clapper);
-  }else if(unit.originId==='red-parish'){
-    const sash=line([[-.27,.16,0],[.28,-.42,0]],color,.9),seal=polygon([[0,.07],[.06,0],[0,-.07],[-.06,0]],color,.95);seal.position.set(.28,-.42,.01);add(sash,seal);
-  }else if(unit.originId==='moth-witness'){
-    const left=polygon([[-.11,.17],[-.48,.33],[-.36,-.03],[-.14,-.16]],color,.34),right=polygon([[.11,.17],[.48,.33],[.36,-.03],[.14,-.16]],color,.34);left.position.z=right.position.z=-.12;add(left,right);
-  }else if(unit.originId==='salt-pilgrim'){
-    [-.24,-.12,0,.12,.24].forEach((x,index)=>{const grain=polygon([[0,.035],[.03,0],[0,-.035],[-.03,0]],index%2?0xe7d9b0:color,.85);grain.position.set(x,-.43,0);relic.add(grain)});
-  }else if(unit.originId==='last-courier'){
-    const pole=line([[-.34,-.36,0],[-.34,.72,0]],0xa59a82,.75),pennant=polygon([[-.34,.7],[.04,.56],[-.34,.35]],color,.68);pennant.position.z=-.1;add(pole,pennant);
-  }else if(unit.originId==='choir-exile'){
-    [-.1,0,.1].forEach((x,index)=>{const voice=line([[x,.2,0],[x*(1.45-index*.25),-.12,0]],color,.72);relic.add(voice)});
-  }else if(unit.originId==='grave-gardener'){
-    const stem=line([[-.3,-.24,0],[-.42,.34,0]],color,.8),leafA=polygon([[0,0],[-.16,.08],[-.04,.17]],color,.72),leafB=polygon([[0,0],[.15,.07],[.04,.16]],color,.72);leafA.position.set(-.4,.16,.01);leafB.position.set(-.38,.01,.01);add(stem,leafA,leafB);
-  }else if(unit.originId==='iron-votary'){
-    const plate=polygon([[-.42,.12],[-.19,.28],[-.08,.08],[-.27,-.05]],color,.82),rivet=circle(.025,flat(0xe6d4ae,.8),8);rivet.position.set(-.25,.12,.01);add(plate,rivet);
-  }else if(unit.originId==='black-star'){
-    const halo=new THREE.Group();for(let i=0;i<8;i+=1){const angle=i/8*Math.PI*2,ray=line([[0,.42,0],[0,.62+(i%2)*.08,0]],color,i%2?.38:.72);ray.rotation.z=angle;halo.add(ray)}halo.position.y=.34;halo.position.z=-.08;add(halo);
-  }else if(unit.originId==='wolf-gate'){
-    const left=polygon([[-.22,.5],[-.38,.84],[-.08,.63]],color,.62),right=polygon([[.22,.5],[.38,.84],[.08,.63]],color,.62);left.position.z=right.position.z=-.02;add(left,right);
-  }else if(unit.originId==='candle-child'){
-    const wick=line([[0,.47,0],[0,.62,0]],0xd9cbb1,.7),flame=polygon([[0,.82],[.08,.66],[0,.57],[-.08,.66]],color,.92);add(wick,flame);
-  }
-  return relic;
+  const relic=new THREE.Group(),sprite=rigidAtlasPlane('/assets/origin-relic-atlas.png',4,3),index=Math.max(0,originArtOrder.indexOf(unit.originId));
+  sprite.userData.setAnimationFrame(index);sprite.scale.set(1.42,1.42,1);sprite.position.set(0,.1,0);relic.position.z=.21;relic.add(sprite);return relic;
 }
 
 function createHeroBody(unit){
@@ -263,16 +239,17 @@ export function createSkeletonVisual(enemy){
   const hp=makeBar(.88,0x9e2d33);hp.position.set(0,-1.18,.3);hp.visible=enemy.elite||enemy.type!=='thrall'&&enemy.type!=='hound';const ap=makeBar(.88,0x737eaa);ap.position.set(0,-1.28,.3);ap.visible=enemy.elite||enemy.template.ranged||enemy.template.aura||enemy.template.bishop||enemy.template.giant;const statusRing=ellipseLoop(.62,.44,0x8faac3,0,40);statusRing.position.set(0,-.27,.25);const shieldRing=ellipseLoop(.68,.49,0x91a7c8,0,44);shieldRing.position.set(0,-.27,.27);const eliteRing=ellipseLoop(.76,.54,enemy.affixColor,enemy.elite?.48:0,48);eliteRing.position.set(0,-.27,.23);const crown=new THREE.Group();
   if(enemy.elite){enemy.affixes.forEach((affix,index)=>{const mark=polygon([[0,.11],[.08,0],[0,-.11],[-.08,0]],affix.color,.92);mark.position.set((index-(enemy.affixes.length-1)/2)*.19,enemy.template.beast?.55:.88,.32);crown.add(mark)})}
   group.add(hp,ap,statusRing,shieldRing,eliteRing,crown);group.scale.setScalar(enemy.template.scale*(enemy.elite?1.04+enemy.affixes.length*.035:1));
-  group.userData={hp,ap,statusRing,shieldRing,eliteRing,crown,body,sprite,phase:Math.random()*8,baseOpacity:enemy.template.phase?.72:1,facing:1};prepareDepthSortedVisual(group);return group;
+  const facingProfile=enemyFacingProfiles[enemy.type]||enemyFacingProfiles.thrall,inwardDirection=enemy.x>0?-1:1;
+  group.userData={hp,ap,statusRing,shieldRing,eliteRing,crown,body,sprite,phase:Math.random()*8,baseOpacity:enemy.template.phase?.72:1,facing:inwardDirection*facingProfile.native};prepareDepthSortedVisual(group);return group;
 }
 
 export function createTreasureVisual(){
-  const group=new THREE.Group(),shadow=ellipse(.23,.065,flat(0x000000,.26),32),sprite=rigidAtlasPlane('/assets/reliquary-shine-atlas.png',2,2),pickTarget=plane(1.05,.8,new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
-  shadow.position.set(0,-.17,-.12);sprite.scale.set(.85,.6375,1);sprite.position.set(0,.01,.42);pickTarget.position.set(0,.01,.76);group.add(shadow,sprite,pickTarget);group.userData={shadow,sprite,pickTarget};return group;
+  const group=new THREE.Group(),shadow=ellipse(.115,.033,flat(0x000000,.26),32),sprite=rigidAtlasPlane('/assets/reliquary-shine-atlas.png',2,2),pickTarget=plane(.76,.56,new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
+  shadow.position.set(0,-.085,-.12);sprite.scale.set(.425,.31875,1);sprite.position.set(0,.005,.42);pickTarget.position.set(0,.005,.76);group.add(shadow,sprite,pickTarget);group.userData={shadow,sprite,pickTarget};return group;
 }
 
 export function updateTreasureVisual(treasure,time=0){
-  const group=treasure?.mesh;if(!group?.userData?.sprite)return;const state=group.userData,sequence=[0,1,2,3,2,1],frame=sequence[Math.floor(time*.0032+treasure.id*.83)%sequence.length],registration=[[-.0475,.0075],[.047,.007],[-.046,-.0075],[.0465,-.007]][frame];group.position.set(treasure.x,treasure.y,.3);group.scale.setScalar(1);group.renderOrder=-12000-Math.round(treasure.y*100);state.sprite.userData.setAnimationFrame(frame);state.sprite.position.set(registration[0],.01+registration[1],.42);state.sprite.material.uniforms.uTint.value.set(treasure.hovered?0xffe8c2:treasure.state==='claimed'?0xffd7a0:0xffffff);state.shadow.material.opacity=treasure.hovered?.34:.24;
+  const group=treasure?.mesh;if(!group?.userData?.sprite)return;const state=group.userData,sequence=[0,1,2,3,2,1],frame=sequence[Math.floor(time*.0032+treasure.id*.83)%sequence.length],registration=[[-.024,.004],[.024,.004],[-.023,-.004],[.023,-.004]][frame];group.position.set(treasure.x,treasure.y,.3);group.scale.setScalar(1);group.renderOrder=-12000-Math.round(treasure.y*100);state.sprite.userData.setAnimationFrame(frame);state.sprite.position.set(registration[0],.005+registration[1],.42);state.sprite.material.uniforms.uTint.value.set(treasure.hovered?0xffe8c2:treasure.state==='claimed'?0xffd7a0:0xffffff);state.shadow.material.opacity=treasure.hovered?.34:.24;
 }
 
 export function disposeTreasureVisual(group){
@@ -281,11 +258,11 @@ export function disposeTreasureVisual(group){
 
 export function updateEntityVisual(entity,selected=false,time=0){
   if(!entity.mesh)return;entity.mesh.position.set(entity.x,entity.y,entity.kind==='hero'?.12:.08);setVisualDepth(entity.mesh,-10000-Math.round(entity.y*100));const ratio=Math.max(0,entity.hp/entity.maxHp);const hpBar=entity.mesh.userData.hp;if(hpBar){hpBar.userData.fill.scale.x=ratio;hpBar.userData.fill.position.x=-(hpBar.userData.width*(1-ratio))/2}
-  const speed=Math.hypot(entity.vx||0,entity.vy||0),motion=Math.min(1,speed/1.6),sprite=entity.mesh.userData.sprite,spriteUniforms=sprite?.userData?.spriteUniforms,phase=entity.visualPhase??entity.mesh.userData.phase??0,cadence=time*(entity.kind==='hero'?.0092:.0076)+phase,stride=Math.sin(cadence*Math.PI/2),previousVx=entity.mesh.userData.previousVx??entity.vx??0,acceleration=(entity.vx||0)-previousVx;entity.mesh.userData.previousVx=entity.vx||0;const facingProfile=entity.kind==='hero'?null:enemyFacingProfiles[entity.type]||enemyFacingProfiles.thrall,targetFacingX=entity.pendingTargetId!=null&&Number.isFinite(entity.pendingTargetX)?entity.pendingTargetX-entity.x:entity.visualTargetX,facingX=facingProfile?.tracksTarget&&Math.abs(targetFacingX||0)>.04?targetFacingX:entity.vx||0;if(Math.abs(facingX)>.04){const direction=facingX<0?-1:1;entity.mesh.userData.facing=entity.kind==='hero'?direction:direction*facingProfile.native}const facing=entity.mesh.userData.facing??(entity.kind==='hero'?1:facingProfile.native),lean=Math.max(-1,Math.min(1,(entity.vx||0)*.28+acceleration*1.7));
+  const speed=Math.hypot(entity.vx||0,entity.vy||0),motion=Math.min(1,speed/1.6),sprite=entity.mesh.userData.sprite,spriteUniforms=sprite?.userData?.spriteUniforms,phase=entity.visualPhase??entity.mesh.userData.phase??0,cadence=time*(entity.kind==='hero'?.0092:.0076)+phase,stride=Math.sin(cadence*Math.PI/2),previousVx=entity.mesh.userData.previousVx??entity.vx??0,acceleration=(entity.vx||0)-previousVx;entity.mesh.userData.previousVx=entity.vx||0;const facingProfile=entity.kind==='hero'?null:enemyFacingProfiles[entity.type]||enemyFacingProfiles.thrall,targetFacingX=entity.pendingTargetId!=null&&Number.isFinite(entity.pendingTargetX)?entity.pendingTargetX-entity.x:entity.visualTargetX,committedFacing=entity.kind==='enemy'&&entity.attackWindup>0&&Math.abs(targetFacingX||0)>.04,facingX=committedFacing?targetFacingX:Math.abs(entity.vx||0)>.04?entity.vx:targetFacingX;if(Math.abs(facingX||0)>.04){const direction=facingX<0?-1:1;entity.mesh.userData.facing=entity.kind==='hero'?direction:direction*facingProfile.native}const facing=entity.mesh.userData.facing??(entity.kind==='hero'?1:facingProfile.native),lean=Math.max(-1,Math.min(1,(entity.vx||0)*.28+acceleration*1.7));
   const action=entity.kind==='hero'?entity.mesh.userData.castPulse||0:entity.attackWindup>0?Math.min(1,.42+entity.attackWindup):0,gaitFrames=[1,0,2,0],frame=action>.16?3:motion>.075?gaitFrames[Math.floor(cadence)%gaitFrames.length]:0;sprite?.userData?.setAnimationFrame?.(frame);
   if(spriteUniforms){spriteUniforms.uTime.value=time*.001;spriteUniforms.uMotion.value=motion;spriteUniforms.uAction.value=action;spriteUniforms.uStride.value=stride;spriteUniforms.uLean.value=lean}
   if(entity.kind==='hero'){
-    const apRatio=Math.max(0,entity.ap/entity.maxAp),apBar=entity.mesh.userData.ap,body=entity.mesh.userData.body;apBar.userData.fill.scale.x=apRatio;apBar.userData.fill.position.x=-(apBar.userData.width*(1-apRatio))/2;hpBar.position.y=selected?-.785:-.79;apBar.position.y=selected?-.905:-.89;hpBar.scale.set(selected?1.06:1,selected?1.22:1,1);apBar.scale.set(selected?1.06:1,selected?1.22:1,1);hpBar.userData.bg.material.color.set(selected?0x211d16:0x050609);apBar.userData.bg.material.color.set(selected?0x211d16:0x050609);hpBar.userData.fill.material.color.set(selected?0x6ab27e:0x4f9d67);apBar.userData.fill.material.color.set(selected?0x929dcc:0x7e89bd);body.scale.x=facing*(1+motion*Math.cos(cadence*Math.PI/2)*.018);body.scale.y=1+action*.028-motion*Math.abs(stride)*.012;body.rotation.z=-lean*facing*.028+stride*motion*.008;
+    const apRatio=Math.max(0,entity.ap/entity.maxAp),apBar=entity.mesh.userData.ap,body=entity.mesh.userData.body;apBar.userData.fill.scale.x=apRatio;apBar.userData.fill.position.x=-(apBar.userData.width*(1-apRatio))/2;hpBar.position.y=selected?-.785:-.79;apBar.position.y=selected?-.915:-.89;hpBar.scale.set(selected?1.04:1,selected?1.08:1,1);apBar.scale.set(selected?1.04:1,selected?1.08:1,1);hpBar.userData.bg.material.color.set(selected?0x101014:0x050609);apBar.userData.bg.material.color.set(selected?0x101014:0x050609);hpBar.userData.fill.material.color.set(selected?0x5ca571:0x4f9d67);apBar.userData.fill.material.color.set(selected?0x8993c2:0x7e89bd);body.scale.x=facing*(1+motion*Math.cos(cadence*Math.PI/2)*.018);body.scale.y=1+action*.028-motion*Math.abs(stride)*.012;body.rotation.z=-lean*facing*.028+stride*motion*.008;
     entity.mesh.position.y+=Math.sin(time*.0022+phase)*.012+Math.abs(stride)*motion*.026;entity.mesh.position.x+=Math.cos(cadence*Math.PI/2)*motion*.006;entity.mesh.userData.castPulse*=.91;entity.mesh.userData.shield.material.opacity=entity.shield>0?.18+Math.sin(time*.004)*.07:0;entity.mesh.userData.shield.rotation.z+=.006;
     const riteHalo=entity.mesh.userData.riteHalo;if(riteHalo){const visible=Math.min(riteHalo.children.length,entity.traits?.length||0),radius=.58+Math.min(.18,visible*.022);riteHalo.children.forEach((mark,index)=>{mark.visible=index<visible;if(!mark.visible)return;const angle=time*.00072+mark.userData.phase;mark.position.x=Math.cos(angle)*radius;mark.position.y=Math.sin(angle)*radius*.72-.04;mark.rotation.z=-angle+Math.PI/4;mark.material.opacity=.48+Math.sin(time*.003+index)*.22});riteHalo.rotation.z=Math.sin(time*.0004+phase)*.08}const originRelic=entity.mesh.userData.originRelic;if(originRelic){originRelic.rotation.z=Math.sin(time*.0014+phase)*.018;const relicBreath=.62*(1+Math.sin(time*.0021+phase)*.025);originRelic.scale.set(relicBreath,relicBreath,1)}
   }else{
@@ -335,13 +312,8 @@ export function createEnemyIntent(scene,enemy,target,color,duration){
 }
 
 export function createCorpseDecal(scene,x,y,type){
-  const group=new THREE.Group(),large=type==='giant'||type==='ossuary',beast=type==='hound',armored=['graveguard','ossuary','giant'].includes(type),scaleValue=large?1.65:beast?.82:1,stain=ellipse(beast?.62:.45,beast?.11:.16,flat(type==='wraith'?0x39405e:0x58151c,large?.22:.18),28);stain.rotation.z=Math.random()*Math.PI;const bone1=line([[-.28,-.1,0],[.3,.12,0]],0xa09683,.32),bone2=line([[-.22,.15,0],[.22,-.15,0]],0xa09683,.28);group.add(stain,bone1,bone2);
-  if(beast){const ribs=ellipseLoop(.32,.14,0xa09683,.24,24),spine=line([[-.42,0,0],[.38,0,0]],0xa09683,.3);group.add(ribs,spine)}
-  else {const skull=circle(.09,flat(0xa09683,.24),14);skull.position.set(.3,.12,.01);group.add(skull)}
-  if(armored){const plate=polygon([[-.24,.13],[.22,.16],[.28,-.12],[-.04,-.22],[-.27,-.08]],0x5b544a,.2);plate.rotation.z=(Math.random()-.5)*.8;group.add(plate)}
-  if(type==='wraith'){const veil=polygon([[-.35,.14],[.35,.12],[.48,-.2],[.08,-.34],[-.42,-.22]],0x515873,.12);group.add(veil)}
-  if(type==='cantor'||type==='bishop'){const brokenStaff=line([[-.48,-.22,0],[-.05,.08,0],[.42,.32,0]],0x8f7393,.25);group.add(brokenStaff)}
-  group.scale.setScalar(scaleValue);group.rotation.z=(Math.random()-.5)*.65;group.position.set(x,y,-.66);group.traverse((object)=>{object.renderOrder=-20000});scene.add(group);return{age:0,duration:18,update(dt){this.age+=dt;if(this.age>14)group.children.forEach((child)=>{if(child.material)child.material.opacity*=.992;else child.traverse?.((part)=>{if(part.material)part.material.opacity*=.992})});return this.age>=this.duration},destroy(){scene.remove(group);disposeObject(group)}}
+  const group=new THREE.Group(),sprite=rigidAtlasPlane('/assets/undead-remains-atlas.png',4,3),index=Math.max(0,enemyArtOrder.indexOf(type)),large=type==='giant'||type==='ossuary',small=type==='hound';
+  sprite.userData.setAnimationFrame(index);sprite.scale.set(large?2.55:small?1.45:1.85,large?1.92:small?1.08:1.39,1);group.add(sprite);group.rotation.z=(Math.random()-.5)*.36;group.position.set(x,y,-.66);group.traverse((object)=>{object.renderOrder=-20000});scene.add(group);return{age:0,duration:18,update(dt){this.age+=dt;sprite.userData.setOpacity(this.age<=14?1:Math.max(0,1-(this.age-14)/4));return this.age>=this.duration},destroy(){scene.remove(group);disposeObject(group)}}
 }
 
 export function createFloatingText(scene,text,x,y,color='#e8deca'){const canvas=document.createElement('canvas');canvas.width=320;canvas.height=104;const ctx=canvas.getContext('2d');ctx.font='600 40px Georgia';ctx.textAlign='center';ctx.fillStyle=color;ctx.shadowColor='#000';ctx.shadowBlur=8;ctx.fillText(text,160,58);const texture=new THREE.CanvasTexture(canvas),material=new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:false}),sprite=new THREE.Sprite(material);sprite.scale.set(2.35,.76,1);sprite.position.set(x,y+.42,2);scene.add(sprite);return{age:0,duration:.68,update(dt){this.age+=dt;const t=Math.min(1,this.age/this.duration);sprite.position.y+=dt*.9;material.opacity=1-t;sprite.scale.x=2.35+Math.sin(t*Math.PI)*.25;return t>=1},destroy(){scene.remove(sprite);texture.dispose();material.dispose()}}}
