@@ -27,9 +27,11 @@ let inspectedUnitId = null;
 
 const abilityArtIndexes=new Map(ABILITY_TEMPLATES.map((ability,index)=>[ability.id,index]));
 const enemyArtIndexes=new Map(Object.keys(ENEMY_ARCHETYPES).map((id,index)=>[id,index]));
+const originArtIndexes=new Map(OATHBOUND_ORIGINS.map((origin,index)=>[origin.id,index]));
 const atlasPosition=(index,columns,rows)=>{const column=index%columns,row=Math.floor(index/columns);return `--art-x:${columns===1?0:column/(columns-1)*100}%;--art-y:${rows===1?0:row/(rows-1)*100}%`};
 const abilityArtStyle=(ability)=>atlasPosition(ability.artIndex??abilityArtIndexes.get(ability.id)??0,6,4);
 const enemyArtStyle=(id)=>atlasPosition(enemyArtIndexes.get(id)??0,4,3);
+const originArtStyle=(id)=>atlasPosition(originArtIndexes.get(id)??0,4,3);
 const abilityArt=(ability,className='ability-art')=>`<span class="${className}" style="${abilityArtStyle(ability)}" role="img" aria-label="${ability.name}"></span>`;
 const upgradeArtStyle=(upgrade)=>{const firstAtlas=upgrade.artIndex<25,localIndex=firstAtlas?upgrade.artIndex:upgrade.artIndex-25;return `${atlasPosition(localIndex,5,firstAtlas?5:4)};--rite-tier:${upgrade.rarity};--rite-inflection:${upgrade.inflectionIndex}`};
 const upgradeArtClass=(upgrade)=>`upgrade-illustration upgrade-atlas-${upgrade.artIndex<25?'a':'b'} inflection-${upgrade.inflectionId} tier-${upgrade.rarity}`;
@@ -161,10 +163,11 @@ function renderDossier(unit) {
   if(!unit)return;
   const dossier=$('#selected-dossier');dossier.style.setProperty('--unit-color',unit.color);
   $('#dossier-art').style.setProperty('--portrait-position',`${unit.portrait*25}%`);
-  $('#dossier-role').textContent=`${unit.role} · ${unit.origin} · ${unit.moveSpeed.toFixed(1)} stride`;
+  $('#dossier-role').textContent=`${unit.role} · ${unit.moveSpeed.toFixed(1)} stride`;
   $('#dossier-state').textContent=unit.alive?(unit.aiState||'Reading the field'):'The doctrine is silent';
   $('#dossier-doctrine').textContent=unit.doctrine;
-  const traits=unit.traits.slice(-2);$('#dossier-traits').innerHTML=`<span class="origin-trait" title="${unit.originDetail}">${unit.originSigil} ${unit.origin}</span>${traits.map((trait)=>`<span title="${trait}">${trait}</span>`).join('')}`;
+  const originColor=`#${Number(unit.originColor||0xd2a65e).toString(16).padStart(6,'0')}`,originArt=$('#dossier-origin-art');originArt.setAttribute('style',`${originArtStyle(unit.originId)};--origin-color:${originColor}`);originArt.setAttribute('aria-label',unit.origin);$('#dossier-origin').style.setProperty('--origin-color',originColor);$('#dossier-origin-name').textContent=unit.origin;$('#dossier-origin-tooltip-name').textContent=`${unit.originSigil} ${unit.origin}`;$('#dossier-origin-detail').textContent=unit.originDetail;
+  const traits=unit.traits.slice(-2);$('#dossier-traits').innerHTML=traits.length?traits.map((trait)=>`<span title="${trait}">${trait}</span>`).join(''):'<span>NO INSCRIBED TRAITS</span>';
 }
 
 function addFeed(message,important=false) {

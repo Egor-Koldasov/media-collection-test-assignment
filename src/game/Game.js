@@ -7,7 +7,7 @@ import { GRAVE_LAWS, applyGraveLawsToHero, lawProduct, lawSum, rollGraveLaws } f
 import {
   buildArena, createAfterimage, createBeam, createBurst, createCorpseDecal, createFloatingText,
   createEnemyIntent, createHeroVisual, createHitSpark, createParticleBurst, createProjectile, createSkeletonVisual,
-  createSlashArc, createTelegraph, createTreasureVisual, createZoneVisual, disposeTreasureVisual, updateEntityVisual, updateTreasureVisual
+  createKnifeProjectile, createSlashArc, createTelegraph, createTreasureVisual, createZoneVisual, disposeTreasureVisual, updateEntityVisual, updateTreasureVisual
 } from './art.js';
 
 const TOTAL_TIME = 20 * 60;
@@ -277,7 +277,7 @@ export class Game {
 
   updateOrbit(unit,dt,enemies){
     if(!unit.orbitCharges)return;unit.orbitDuration-=dt;unit.orbitTimer-=dt;if(unit.orbitDuration<=0){unit.orbitCharges=0;return}if(unit.orbitTimer>0)return;unit.orbitTimer=.42;
-    const target=enemies.filter((enemy)=>enemy.alive&&distance(unit,enemy)<3).sort((a,b)=>distance(unit,a)-distance(unit,b))[0];if(!target)return;unit.orbitCharges-=1;this.damageEnemy(target,unit.orbitPower,unit,false);this.effects.push(createProjectile(this.scene,unit,target,0xd8c8ad,.09));
+    const target=enemies.filter((enemy)=>enemy.alive&&distance(unit,enemy)<3).sort((a,b)=>distance(unit,a)-distance(unit,b))[0];if(!target)return;const knifeVariant=(unit.id+unit.orbitCharges)%4;unit.orbitCharges-=1;this.damageEnemy(target,unit.orbitPower,unit,false);this.effects.push(createKnifeProjectile(this.scene,unit,target,knifeVariant));
   }
 
   damageEnemy(enemy,amount,source,critical=false,flags={}){

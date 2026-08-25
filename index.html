@@ -42,7 +42,15 @@
             <div id="roster" class="roster"></div>
             <div id="selected-dossier" class="selected-dossier">
               <div id="dossier-art" class="dossier-art"></div>
-              <div class="dossier-copy"><span id="dossier-role">AUTONOMOUS DOCTRINE</span><strong id="dossier-state">Awaiting an oathbound</strong><p id="dossier-doctrine">The field makes its own decisions.</p><div id="dossier-traits" class="dossier-traits"><span>UNMARKED</span></div></div>
+              <div class="dossier-copy">
+                <span id="dossier-role">AUTONOMOUS DOCTRINE</span><strong id="dossier-state">Awaiting an oathbound</strong><p id="dossier-doctrine">The field makes its own decisions.</p>
+                <div id="dossier-origin" class="dossier-origin" tabindex="0" aria-describedby="dossier-origin-tooltip">
+                  <span id="dossier-origin-art" class="dossier-origin-art" role="img"></span>
+                  <span class="dossier-origin-label"><small>INHERITED ORIGIN</small><b id="dossier-origin-name">Unrecorded provenance</b></span>
+                  <div id="dossier-origin-tooltip" class="dossier-origin-tooltip" role="tooltip"><small>OATHBOUND PROVENANCE</small><strong id="dossier-origin-tooltip-name">Unrecorded provenance</strong><p id="dossier-origin-detail">No origin has answered.</p></div>
+                </div>
+                <div id="dossier-traits" class="dossier-traits"><span>UNMARKED</span></div>
+              </div>
             </div>
             <div class="sequence-panel"><div class="sequence-heading"><span>Automatic litany</span><button id="reorder-button" class="reorder-button" type="button">rewrite order</button></div><div id="sequence" class="sequence"></div><div id="ability-inspector" class="ability-inspector" aria-hidden="true"></div></div>
             <div class="omens"><div class="omens-heading"><span>Field omens</span><i></i></div><div id="combat-feed" class="combat-feed" aria-live="polite"></div></div>
