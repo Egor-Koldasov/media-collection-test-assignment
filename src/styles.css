@@ -164,3 +164,14 @@ body{font-size:13px}.shell{grid-template-rows:96px minmax(0,1fr) 42px}.game-layo
 
 /* Folio repairs: names stay legible, and a solitary rite keeps icon scale instead of annexing the panel. */
 .unit-card{color:var(--bone)}.unit-name strong{color:#eee2cd;text-shadow:0 1px 4px #000}.sequence{justify-content:start}
+
+/* The battle finally owns the screen. Its visible HUD is painted into WebGL. */
+html,body,#app{width:100%;height:100%;min-height:0;overflow:hidden;background:#030407}
+.shell{position:fixed;inset:0;width:100%;height:100%;display:block;padding:0;border:0;background:#030407}
+.shell::before,.topbar,.folio,.bottombar,.stage-grain,.stage-corners,.threat-plaque,.wave-inscription,.grave-law-strip,.encounter-banner,.paused-seal{display:none!important}
+.game-layout{position:absolute;inset:0;display:block;min-height:0;padding:0;margin:0}
+.battlefield-panel{position:absolute;inset:0;min-width:0;min-height:0;border:0;background:#030407;box-shadow:none;overflow:hidden}
+.stage{position:absolute;inset:0;width:100%;height:100%;overflow:hidden}
+.stage canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block;touch-action:none;cursor:grab;outline:none}
+.stage canvas:active{cursor:grabbing}
+.modal,.grave-archive{isolation:isolate}

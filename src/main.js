@@ -191,7 +191,7 @@ function showModal() {
 function hideModal() {
   modal.classList.remove('is-visible');
   shell.inert=false;
-  if(modal.contains(document.activeElement))$('#pause-button').focus({preventScroll:true});
+  if(modal.contains(document.activeElement)){document.activeElement.blur();game?.renderer?.domElement?.focus({preventScroll:true})}
   modal.inert=true;
   modal.setAttribute('aria-hidden','true');
 }
@@ -242,6 +242,8 @@ const game=new Game(stage,{
   onMilestone:showEncounter,
   onDiscovery:renderArchive,
   onUpgrade:renderUpgradeChoices,
+  onArchive:openArchive,
+  onOrder:openOrderEditor,
   onPause:(paused)=>{pausedSeal.hidden=!paused;$('#pause-button').textContent=paused?'▶':'Ⅱ'},
   onEnd:renderOutcome
 });
