@@ -45,8 +45,14 @@ export function chooseSpawnPack(progress,context={}){
 
 export function getBellEncounter(minute){return BELL_ENCOUNTERS.find((event)=>event.minute===minute)||null}
 
-export function createFormationPositions(count,cameraRight,formation='cluster',angle=Math.random()*Math.PI*2){
-  const radiusX=Math.max(10.7,Math.abs(cameraRight)*.9),radiusY=7.15;const positions=[];
+export function createFormationPositions(count,formationOrLegacyCamera='cluster',angleOrFormation=Math.random()*Math.PI*2,legacyAngle=null){
+  // The legacy signature included cameraRight, which made the encounter geometry
+  // change when the browser was resized or the camera zoomed. Keep accepting that
+  // call shape during the transition, but deliberately discard the camera value.
+  const legacyCall=typeof formationOrLegacyCamera==='number';
+  const formation=legacyCall?(typeof angleOrFormation==='string'?angleOrFormation:'cluster'):formationOrLegacyCamera;
+  const angle=legacyCall?(Number.isFinite(legacyAngle)?legacyAngle:Math.random()*Math.PI*2):(Number.isFinite(angleOrFormation)?angleOrFormation:Math.random()*Math.PI*2);
+  const radiusX=11.5,radiusY=7.7,positions=[];
   for(let i=0;i<count;i+=1){
     const centered=i-(count-1)/2;let localAngle=angle,depth=0,tangent=centered*.64;
     if(formation==='arc')localAngle=angle+centered*.075;

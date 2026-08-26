@@ -11,6 +11,13 @@ import {
 } from './art.js';
 
 const TOTAL_TIME = 20 * 60;
+const WORLD_WIDTH = 36;
+const WORLD_HEIGHT = 20.25;
+const ACTION_VIEW_VERTICAL = 18.4;
+const MAX_CAMERA_ZOOM = 2.2;
+const SPAWN_RADIUS_X = 11.5;
+const SPAWN_RADIUS_Y = 7.7;
+const CAMERA_DRAG_THRESHOLD = 5;
 const FORMATION = [[0,0],[-1.45,-.85],[1.45,-.85],[-1.75,1.05],[1.75,1.05],[0,1.75]];
 const SELF_CAST_KINDS = new Set(['riposte','orbit','trap','sanctuary']);
 const BELL_BENEDICTIONS = {
@@ -81,29 +88,164 @@ class RitualAudio {
 
 export class Game {
   constructor(stage,events={},options={}){
-    this.stage=stage;this.events=events;this.headless=options.headless===true;this.difficultyLevel=clamp(Math.round(Number(options.difficulty)||4),1,5);this.difficulty=DIFFICULTY_PRESETS[this.difficultyLevel-1];this.scene=new THREE.Scene();this.camera=new THREE.OrthographicCamera(-14,14,8,-8,.1,100);this.camera.position.z=20;
+    const initialAspect=16/9,initialWidth=ACTION_VIEW_VERTICAL*initialAspect;
+    this.stage=stage;this.events=events;this.headless=options.headless===true;this.difficultyLevel=clamp(Math.round(Number(options.difficulty)||4),1,5);this.difficulty=DIFFICULTY_PRESETS[this.difficultyLevel-1];this.scene=new THREE.Scene();this.camera=new THREE.OrthographicCamera(-initialWidth/2,initialWidth/2,ACTION_VIEW_VERTICAL/2,-ACTION_VIEW_VERTICAL/2,.1,100);this.camera.position.z=20;
+    this.cameraTarget=new THREE.Vector2();this.cameraViewport={width:1,height:1,aspect:initialAspect};this.cameraFitZoom=Math.min(initialWidth/WORLD_WIDTH,ACTION_VIEW_VERTICAL/WORLD_HEIGHT);this.cameraMaxZoom=MAX_CAMERA_ZOOM;this.cameraMode='action';this.followSelected=false;this.cameraPressedKeys=new Set();this.cameraPointers=new Map();this.cameraGesture=null;this.cameraPointerWorld={x:0,y:0};this.cameraShakeOffset={x:0,y:0};this.ignoreTreasureClickUntil=0;this.resizeObserver=null;this.interfaceLayer=null;this.cameraReady=false;this.camera.zoom=1;
     if(this.headless){this.renderer={dispose(){},render(){}};this.arena={pulse(){},setBell(){},applyLaws(){},update(){}}}
-    else{this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.stage.appendChild(this.renderer.domElement);this.arena=buildArena(this.scene);this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2()}
+    else{this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.domElement.style.touchAction='none';this.stage.appendChild(this.renderer.domElement);this.arena=buildArena(this.scene);this.raycaster=new THREE.Raycaster();this.pointer=new THREE.Vector2()}
     this.audio=new RitualAudio();this.clock=new THREE.Clock(false);this.elapsed=0;this.running=false;this.paused=false;this.modalPaused=false;this.ended=false;
     this.units=[];this.enemies=[];this.treasures=[];this.effects=[];this.zones=[];this.deferred=[];this.selectedId=null;this.nextEntityId=1;this.nextCohortId=1;this.killCount=0;this.spawnWait=2.2*this.difficulty.spawnInterval;this.upgradeDropIndex=0;this.nextUpgrade=UPGRADE_DROP_TIMES[0];this.pendingTreasureDrops=0;this.hoverTreasureId=null;this.arrivalIndex=0;this.arrivalTimes=[240,480,720,960];this.lastHud=0;this.lastOmen=0;this.lastBell=0;this.appliedUpgradeIds=new Set();this.animationFrame=0;this.cameraShake=0;this.maxEnemies=Math.round(118*this.difficulty.capacity);this.currentEncounter=null;this.chronicle=loadChronicle();this.graveLaws=rollGraveLaws(2,options.lawIds);this.arena.applyLaws?.(this.graveLaws);
-    this.boundResize=()=>this.resize();this.boundTreasureMove=(event)=>this.handleTreasurePointer(event,false);this.boundTreasureClick=(event)=>this.handleTreasurePointer(event,true);this.boundTreasureLeave=()=>this.clearTreasureHover();if(!this.headless){window.addEventListener('resize',this.boundResize);this.renderer.domElement.addEventListener('pointermove',this.boundTreasureMove);this.renderer.domElement.addEventListener('click',this.boundTreasureClick);this.renderer.domElement.addEventListener('pointerleave',this.boundTreasureLeave);this.resize();this.render(0)}
+    this.boundResize=()=>this.resize();this.boundTreasureMove=(event)=>this.handleTreasurePointer(event,false);this.boundTreasureClick=(event)=>this.handleTreasurePointer(event,true);this.boundTreasureLeave=()=>this.clearTreasureHover();this.boundCameraKeyDown=(event)=>this.handleCameraKeyDown(event);this.boundCameraKeyUp=(event)=>this.handleCameraKeyUp(event);this.boundCameraBlur=()=>this.clearCameraInput();this.boundCameraPointerDown=(event)=>this.handleCameraPointerDown(event);this.boundCameraPointerMove=(event)=>this.handleCameraPointerMove(event);this.boundCameraPointerUp=(event)=>this.handleCameraPointerUp(event);this.boundCameraWheel=(event)=>this.handleCameraWheel(event);this.boundCameraContextMenu=(event)=>this.handleCameraContextMenu(event);
+    if(!this.headless){
+      window.addEventListener('resize',this.boundResize);window.addEventListener('keydown',this.boundCameraKeyDown);window.addEventListener('keyup',this.boundCameraKeyUp);window.addEventListener('blur',this.boundCameraBlur);
+      this.renderer.domElement.addEventListener('pointermove',this.boundTreasureMove);this.renderer.domElement.addEventListener('click',this.boundTreasureClick);this.renderer.domElement.addEventListener('pointerleave',this.boundTreasureLeave);this.renderer.domElement.addEventListener('pointerdown',this.boundCameraPointerDown);this.renderer.domElement.addEventListener('pointermove',this.boundCameraPointerMove);this.renderer.domElement.addEventListener('pointerup',this.boundCameraPointerUp);this.renderer.domElement.addEventListener('pointercancel',this.boundCameraPointerUp);this.renderer.domElement.addEventListener('lostpointercapture',this.boundCameraPointerUp);this.renderer.domElement.addEventListener('wheel',this.boundCameraWheel,{passive:false});this.renderer.domElement.addEventListener('contextmenu',this.boundCameraContextMenu);
+      if(typeof ResizeObserver!=='undefined'){this.resizeObserver=new ResizeObserver(this.boundResize);this.resizeObserver.observe(this.stage)}
+      this.resize();this.render(0);
+    }
+    this.cameraReady=true;if(!this.headless)this.loop();
   }
 
-  start(){if(this.running)return;if(!this.headless){this.audio.start();this.audio.playWhenReady('ritualBell',{gain:.88})}this.running=true;this.clock.start();let newLaw=false;this.graveLaws.forEach((law)=>{newLaw=discoverLaw(this.chronicle,law.id)||newLaw});this.addUnit(generateOathbound([],0),true);this.feed('The first oathbound answers.',true);this.graveLaws.forEach((law)=>this.feed(`<strong>${law.name}</strong> — ${law.text}`,true));if(newLaw)this.events.onDiscovery?.(this.snapshot());this.events.onStart?.();if(!this.headless)this.loop()}
-  destroy(){if(!this.headless){cancelAnimationFrame(this.animationFrame);window.removeEventListener('resize',this.boundResize);this.renderer.domElement.removeEventListener('pointermove',this.boundTreasureMove);this.renderer.domElement.removeEventListener('click',this.boundTreasureClick);this.renderer.domElement.removeEventListener('pointerleave',this.boundTreasureLeave);this.audio.destroy()}this.renderer.dispose()}
-  resize(){if(this.headless)return;const width=Math.max(1,this.stage.clientWidth);const height=Math.max(1,this.stage.clientHeight);this.renderer.setSize(width,height,false);const aspect=width/height;const vertical=18.4;this.camera.top=vertical/2;this.camera.bottom=-vertical/2;this.camera.left=-vertical*aspect/2;this.camera.right=vertical*aspect/2;this.camera.updateProjectionMatrix()}
+  start(){if(this.running)return;if(!this.headless){this.audio.start();this.audio.playWhenReady('ritualBell',{gain:.88})}this.running=true;this.clock.start();let newLaw=false;this.graveLaws.forEach((law)=>{newLaw=discoverLaw(this.chronicle,law.id)||newLaw});this.addUnit(generateOathbound([],0),true);this.feed('The first oathbound answers.',true);this.graveLaws.forEach((law)=>this.feed(`<strong>${law.name}</strong> — ${law.text}`,true));if(newLaw)this.events.onDiscovery?.(this.snapshot());this.events.onStart?.()}
+  destroy(){
+    if(!this.headless){
+      cancelAnimationFrame(this.animationFrame);this.resizeObserver?.disconnect();window.removeEventListener('resize',this.boundResize);window.removeEventListener('keydown',this.boundCameraKeyDown);window.removeEventListener('keyup',this.boundCameraKeyUp);window.removeEventListener('blur',this.boundCameraBlur);
+      this.renderer.domElement.removeEventListener('pointermove',this.boundTreasureMove);this.renderer.domElement.removeEventListener('click',this.boundTreasureClick);this.renderer.domElement.removeEventListener('pointerleave',this.boundTreasureLeave);this.renderer.domElement.removeEventListener('pointerdown',this.boundCameraPointerDown);this.renderer.domElement.removeEventListener('pointermove',this.boundCameraPointerMove);this.renderer.domElement.removeEventListener('pointerup',this.boundCameraPointerUp);this.renderer.domElement.removeEventListener('pointercancel',this.boundCameraPointerUp);this.renderer.domElement.removeEventListener('lostpointercapture',this.boundCameraPointerUp);this.renderer.domElement.removeEventListener('wheel',this.boundCameraWheel);this.renderer.domElement.removeEventListener('contextmenu',this.boundCameraContextMenu);this.clearCameraInput();this.audio.destroy();
+    }
+    this.interfaceLayer?.destroy?.();this.interfaceLayer=null;this.renderer.dispose();
+  }
+
+  setInterfaceLayer(layer){
+    if(this.interfaceLayer&&this.interfaceLayer!==layer)this.interfaceLayer.destroy?.();this.interfaceLayer=layer||null;
+    if(this.interfaceLayer&&!this.headless){const {width,height}=this.cameraViewport;this.interfaceLayer.resize?.(width,height,this.renderer.getPixelRatio());this.notifyCameraChanged();this.requestCameraRender()}
+    return this.interfaceLayer;
+  }
+
+  resize(){
+    if(this.headless)return;
+    const width=Math.max(1,this.stage.clientWidth),height=Math.max(1,this.stage.clientHeight),aspect=width/height,pixelRatio=Math.min(window.devicePixelRatio||1,1.75),keepFit=this.cameraMode==='fit';
+    this.renderer.setPixelRatio(pixelRatio);this.renderer.setSize(width,height,false);this.cameraViewport={width,height,aspect};this.camera.top=ACTION_VIEW_VERTICAL/2;this.camera.bottom=-ACTION_VIEW_VERTICAL/2;this.camera.left=-ACTION_VIEW_VERTICAL*aspect/2;this.camera.right=ACTION_VIEW_VERTICAL*aspect/2;this.cameraFitZoom=Math.min((this.camera.right-this.camera.left)/WORLD_WIDTH,(this.camera.top-this.camera.bottom)/WORLD_HEIGHT);
+    if(keepFit){this.camera.zoom=this.cameraFitZoom;this.cameraTarget.set(0,0)}else if(this.cameraMode==='action')this.camera.zoom=this.getActionCameraZoom();else this.camera.zoom=clamp(this.camera.zoom,this.cameraFitZoom,this.cameraMaxZoom);
+    this.clampCameraTarget();this.camera.updateProjectionMatrix();this.applyCameraTransform();this.interfaceLayer?.resize?.(width,height,pixelRatio);if(this.cameraReady)this.notifyCameraChanged();
+  }
+
+  cameraControlsAvailable(){return !this.headless&&this.running&&!this.modalPaused&&!this.ended}
+  isCameraKeyboardTarget(target){return !!target&&(target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName||''))}
+
+  handleCameraKeyDown(event){
+    if(this.isCameraKeyboardTarget(event.target)||event.metaKey||event.ctrlKey||event.altKey)return;
+    const panCodes=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowLeft','ArrowDown','ArrowRight']);
+    if(panCodes.has(event.code)){if(!this.cameraControlsAvailable())return;this.cameraPressedKeys.add(event.code);this.followSelected=false;this.cameraMode='free';event.preventDefault();return}
+    if(!this.cameraControlsAvailable()||event.repeat)return;
+    if(event.code==='Home'){event.preventDefault();this.fitCamera()}
+    else if(event.code==='Digit0'||event.code==='Numpad0'){event.preventDefault();this.resetCamera()}
+  }
+
+  handleCameraKeyUp(event){this.cameraPressedKeys.delete(event.code)}
+
+  handleCameraContextMenu(event){if(this.cameraControlsAvailable())event.preventDefault()}
+
+  clearCameraInput(){
+    this.cameraPressedKeys.clear();
+    if(!this.headless){for(const pointerId of this.cameraPointers.keys()){try{if(this.renderer.domElement.hasPointerCapture(pointerId))this.renderer.domElement.releasePointerCapture(pointerId)}catch{}}}
+    this.cameraPointers.clear();this.cameraGesture=null;
+  }
+
+  handleCameraPointerDown(event){
+    if(event.defaultPrevented||!this.cameraControlsAvailable())return;
+    const isTouch=event.pointerType==='touch',isDragButton=event.button===1||event.button===2;if(!isTouch&&!isDragButton)return;
+    this.updateCameraPointerWorld(event.clientX,event.clientY);this.cameraPointers.set(event.pointerId,{id:event.pointerId,type:event.pointerType,x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY});
+    try{this.renderer.domElement.setPointerCapture(event.pointerId)}catch{}
+    const touches=[...this.cameraPointers.values()].filter((pointer)=>pointer.type==='touch');
+    if(isTouch&&touches.length>=2){const [a,b]=touches,center={x:(a.x+b.x)/2,y:(a.y+b.y)/2};this.cameraGesture={kind:'pinch',lastCenter:center,lastDistance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),dragged:true};this.ignoreTreasureClickUntil=performance.now()+180}
+    else this.cameraGesture={kind:isTouch?'touch':'mouse',pointerId:event.pointerId,lastX:event.clientX,lastY:event.clientY,startX:event.clientX,startY:event.clientY,dragged:false};
+    if(!isTouch)event.preventDefault();
+  }
+
+  handleCameraPointerMove(event){
+    this.updateCameraPointerWorld(event.clientX,event.clientY);if(!this.cameraControlsAvailable())return;
+    const pointer=this.cameraPointers.get(event.pointerId);if(!pointer)return;pointer.x=event.clientX;pointer.y=event.clientY;
+    const touches=[...this.cameraPointers.values()].filter((item)=>item.type==='touch');
+    if(touches.length>=2){
+      const [a,b]=touches,center={x:(a.x+b.x)/2,y:(a.y+b.y)/2},distanceNow=Math.max(1,Math.hypot(a.x-b.x,a.y-b.y));
+      if(this.cameraGesture?.kind!=='pinch')this.cameraGesture={kind:'pinch',lastCenter:center,lastDistance:distanceNow,dragged:true};
+      else {const dx=center.x-this.cameraGesture.lastCenter.x,dy=center.y-this.cameraGesture.lastCenter.y,zoom=this.camera.zoom*(distanceNow/this.cameraGesture.lastDistance);if(dx||dy)this.panCameraPixels(dx,dy);this.zoomCameraAt(center.x,center.y,zoom);this.cameraGesture.lastCenter=center;this.cameraGesture.lastDistance=distanceNow}
+      this.cameraGesture.dragged=true;this.ignoreTreasureClickUntil=performance.now()+180;event.preventDefault();return;
+    }
+    const gesture=this.cameraGesture;if(!gesture||gesture.pointerId!==event.pointerId)return;const total=Math.hypot(event.clientX-gesture.startX,event.clientY-gesture.startY);
+    if(!gesture.dragged&&total<CAMERA_DRAG_THRESHOLD)return;
+    const dx=event.clientX-gesture.lastX,dy=event.clientY-gesture.lastY;gesture.dragged=true;gesture.lastX=event.clientX;gesture.lastY=event.clientY;this.ignoreTreasureClickUntil=performance.now()+180;this.panCameraPixels(dx,dy);event.preventDefault();
+  }
+
+  handleCameraPointerUp(event){
+    const pointer=this.cameraPointers.get(event.pointerId),dragged=this.cameraGesture?.dragged;this.cameraPointers.delete(event.pointerId);try{if(this.renderer.domElement.hasPointerCapture(event.pointerId))this.renderer.domElement.releasePointerCapture(event.pointerId)}catch{}
+    if(dragged)this.ignoreTreasureClickUntil=performance.now()+180;
+    const touches=[...this.cameraPointers.values()].filter((item)=>item.type==='touch');
+    if(touches.length===1){const remaining=touches[0];this.cameraGesture={kind:'touch',pointerId:remaining.id,lastX:remaining.x,lastY:remaining.y,startX:remaining.x,startY:remaining.y,dragged:!!dragged}}
+    else if(!touches.length||pointer?.type!=='touch')this.cameraGesture=null;
+  }
+
+  handleCameraWheel(event){
+    if(event.defaultPrevented||!this.cameraControlsAvailable())return;event.preventDefault();this.updateCameraPointerWorld(event.clientX,event.clientY);const units=event.deltaMode===1?16:event.deltaMode===2?this.cameraViewport.height:1,delta=clamp(event.deltaY*units,-240,240),nextZoom=this.camera.zoom*Math.exp(-delta*.0018);this.zoomCameraAt(event.clientX,event.clientY,nextZoom);
+  }
+
+  updateCameraControls(dt){
+    if(!this.cameraControlsAvailable()){this.cameraPressedKeys.clear();return}
+    let changed=false;if(this.followSelected){const selected=this.units.find((unit)=>unit.id===this.selectedId&&unit.alive);if(selected){const smoothing=1-Math.exp(-dt*7),beforeX=this.cameraTarget.x,beforeY=this.cameraTarget.y;this.cameraTarget.x+=(selected.x-this.cameraTarget.x)*smoothing;this.cameraTarget.y+=(selected.y-this.cameraTarget.y)*smoothing;this.clampCameraTarget();changed=Math.abs(this.cameraTarget.x-beforeX)>.0001||Math.abs(this.cameraTarget.y-beforeY)>.0001}else{this.followSelected=false;this.cameraMode='free';changed=true}}
+    const left=this.cameraPressedKeys.has('KeyA')||this.cameraPressedKeys.has('ArrowLeft'),right=this.cameraPressedKeys.has('KeyD')||this.cameraPressedKeys.has('ArrowRight'),up=this.cameraPressedKeys.has('KeyW')||this.cameraPressedKeys.has('ArrowUp'),down=this.cameraPressedKeys.has('KeyS')||this.cameraPressedKeys.has('ArrowDown');let x=Number(right)-Number(left),y=Number(up)-Number(down);
+    if(x||y){const length=Math.hypot(x,y)||1,speed=7.4/this.camera.zoom;x=x/length*speed*dt;y=y/length*speed*dt;this.cameraTarget.x+=x;this.cameraTarget.y+=y;this.followSelected=false;this.cameraMode='free';this.clampCameraTarget();changed=true}if(changed)this.notifyCameraChanged();
+  }
+
+  panCameraPixels(deltaX,deltaY){
+    const width=Math.max(1,this.cameraViewport.width),height=Math.max(1,this.cameraViewport.height),worldPerPixelX=(this.camera.right-this.camera.left)/(this.camera.zoom*width),worldPerPixelY=(this.camera.top-this.camera.bottom)/(this.camera.zoom*height);this.cameraTarget.x-=deltaX*worldPerPixelX;this.cameraTarget.y+=deltaY*worldPerPixelY;this.followSelected=false;this.cameraMode='free';this.clampCameraTarget();this.applyCameraTransform();this.notifyCameraChanged();this.requestCameraRender();return this.getCameraDebug();
+  }
+
+  zoomCameraAt(clientX,clientY,zoom){
+    if(this.headless)return this.getCameraDebug();const before=this.screenToWorld(clientX,clientY),next=clamp(zoom,this.cameraFitZoom,this.cameraMaxZoom);if(Math.abs(next-this.camera.zoom)<.00001)return this.getCameraDebug();this.camera.zoom=next;this.camera.updateProjectionMatrix();const after=this.screenToWorld(clientX,clientY);this.cameraTarget.x+=before.x-after.x;this.cameraTarget.y+=before.y-after.y;this.followSelected=false;this.cameraMode='free';this.clampCameraTarget();this.applyCameraTransform();this.updateCameraPointerWorld(clientX,clientY);this.notifyCameraChanged();this.requestCameraRender();return this.getCameraDebug();
+  }
+
+  getActionCameraZoom(){return clamp(Math.max(1,(this.camera.right-this.camera.left)/WORLD_WIDTH,(this.camera.top-this.camera.bottom)/WORLD_HEIGHT),this.cameraFitZoom,this.cameraMaxZoom)}
+
+  fitCamera(){this.followSelected=false;this.cameraMode='fit';this.cameraTarget.set(0,0);this.camera.zoom=this.cameraFitZoom;this.camera.updateProjectionMatrix();this.applyCameraTransform();this.notifyCameraChanged();this.requestCameraRender();return this.getCameraDebug()}
+  resetCamera(){this.followSelected=false;this.cameraMode='action';this.cameraTarget.set(0,0);this.camera.zoom=this.getActionCameraZoom();this.camera.updateProjectionMatrix();this.applyCameraTransform();this.notifyCameraChanged();this.requestCameraRender();return this.getCameraDebug()}
+
+  toggleFollowSelected(force){
+    const selected=this.units.find((unit)=>unit.id===this.selectedId&&unit.alive),next=typeof force==='boolean'?force:!this.followSelected;if(next&&!selected){this.followSelected=false;this.notifyCameraChanged();return false}this.followSelected=next;this.cameraMode=next?'follow':'free';if(next){this.cameraTarget.set(selected.x,selected.y);this.clampCameraTarget();this.applyCameraTransform();this.requestCameraRender()}this.notifyCameraChanged();return this.followSelected;
+  }
+
+  clampCameraTarget(){
+    const halfWidth=(this.camera.right-this.camera.left)/(2*this.camera.zoom),halfHeight=(this.camera.top-this.camera.bottom)/(2*this.camera.zoom),limitX=Math.max(0,WORLD_WIDTH/2-halfWidth),limitY=Math.max(0,WORLD_HEIGHT/2-halfHeight);this.cameraTarget.x=clamp(this.cameraTarget.x,-limitX,limitX);this.cameraTarget.y=clamp(this.cameraTarget.y,-limitY,limitY);return this.cameraTarget;
+  }
+
+  applyCameraTransform(shakeX=0,shakeY=0){this.cameraShakeOffset.x=shakeX;this.cameraShakeOffset.y=shakeY;this.camera.position.set(this.cameraTarget.x+shakeX,this.cameraTarget.y+shakeY,20);this.camera.updateMatrixWorld();}
+
+  screenToWorld(clientX,clientY){
+    if(this.headless)return{x:this.cameraTarget.x,y:this.cameraTarget.y};const bounds=this.renderer.domElement.getBoundingClientRect(),nx=clamp((clientX-bounds.left)/Math.max(1,bounds.width),0,1)*2-1,ny=-(clamp((clientY-bounds.top)/Math.max(1,bounds.height),0,1)*2-1),halfWidth=(this.camera.right-this.camera.left)/(2*this.camera.zoom),halfHeight=(this.camera.top-this.camera.bottom)/(2*this.camera.zoom);return{x:this.cameraTarget.x+nx*halfWidth,y:this.cameraTarget.y+ny*halfHeight};
+  }
+
+  updateCameraPointerWorld(clientX,clientY){this.cameraPointerWorld=this.screenToWorld(clientX,clientY);return this.cameraPointerWorld}
+
+  getCameraDebug(){
+    const halfWidth=(this.camera.right-this.camera.left)/(2*this.camera.zoom),halfHeight=(this.camera.top-this.camera.bottom)/(2*this.camera.zoom),center={x:this.cameraTarget.x,y:this.cameraTarget.y},visible={left:this.cameraTarget.x-halfWidth,right:this.cameraTarget.x+halfWidth,bottom:this.cameraTarget.y-halfHeight,top:this.cameraTarget.y+halfHeight,width:halfWidth*2,height:halfHeight*2};
+    return{x:center.x,y:center.y,center,zoom:this.camera.zoom,fitZoom:this.cameraFitZoom,minZoom:this.cameraFitZoom,maxZoom:this.cameraMaxZoom,mode:this.cameraMode,followingSelected:this.followSelected,controlsEnabled:this.cameraControlsAvailable(),viewport:{...this.cameraViewport,pixelRatio:this.headless?1:this.renderer.getPixelRatio()},visible,visibleRect:visible,world:{left:-WORLD_WIDTH/2,right:WORLD_WIDTH/2,bottom:-WORLD_HEIGHT/2,top:WORLD_HEIGHT/2,width:WORLD_WIDTH,height:WORLD_HEIGHT},pointerWorld:{...this.cameraPointerWorld}};
+  }
+
+  notifyCameraChanged(){this.events.onCamera?.(this.getCameraDebug())}
+
+  requestCameraRender(){if(!this.headless&&!this.running)this.render(performance.now())}
+
   togglePause(force){if(!this.running||this.ended||this.modalPaused)return this.paused;this.paused=typeof force==='boolean'?force:!this.paused;this.audio.setPaused(this.paused);this.events.onPause?.(this.paused);return this.paused}
-  setModalPaused(value){this.modalPaused=value}
+  setModalPaused(value){this.modalPaused=!!value;if(this.modalPaused)this.clearCameraInput();this.notifyCameraChanged()}
   setDifficulty(level){if(this.running)return this.difficulty;this.difficultyLevel=clamp(Math.round(Number(level)||4),1,5);this.difficulty=DIFFICULTY_PRESETS[this.difficultyLevel-1];this.spawnWait=2.2*this.difficulty.spawnInterval;this.maxEnemies=Math.round(118*this.difficulty.capacity);return this.difficulty}
   toggleSound(){return this.audio.toggle()}
   playUi(){if(this.headless)return;this.audio.start();this.audio.playWhenReady('uiParchment')}
-  selectUnit(id){if(this.units.some((unit)=>unit.id===id)){this.selectedId=id;this.events.onRoster?.(this.snapshot())}}
+  selectUnit(id){if(this.units.some((unit)=>unit.id===id)){this.selectedId=id;if(this.followSelected){const unit=this.units.find((item)=>item.id===id&&item.alive);if(unit){this.cameraTarget.set(unit.x,unit.y);this.clampCameraTarget();this.applyCameraTransform();this.notifyCameraChanged()}}this.events.onRoster?.(this.snapshot())}}
 
   clearTreasureHover(){this.hoverTreasureId=null;this.treasures.forEach((treasure)=>treasure.hovered=false);if(!this.headless)this.renderer.domElement.style.cursor=''}
   handleTreasurePointer(event,activate=false){
     if(this.headless||!this.running||this.paused||this.modalPaused||this.ended){this.clearTreasureHover();return null}
+    if(activate&&performance.now()<this.ignoreTreasureClickUntil){this.clearTreasureHover();event.preventDefault();return null}
     const targets=this.treasures.filter((treasure)=>treasure.state==='waiting').map((treasure)=>treasure.mesh.userData.pickTarget);if(!targets.length){this.clearTreasureHover();return null}
-    const bounds=this.renderer.domElement.getBoundingClientRect();this.pointer.set((event.clientX-bounds.left)/bounds.width*2-1,-((event.clientY-bounds.top)/bounds.height)*2+1);this.raycaster.setFromCamera(this.pointer,this.camera);const hit=this.raycaster.intersectObjects(targets,false)[0],treasure=hit?this.treasures.find((item)=>item.id===hit.object.userData.treasureId):null;
+    const bounds=this.renderer.domElement.getBoundingClientRect();this.pointer.set((event.clientX-bounds.left)/bounds.width*2-1,-((event.clientY-bounds.top)/bounds.height)*2+1);this.camera.updateMatrixWorld();this.raycaster.setFromCamera(this.pointer,this.camera);const hit=this.raycaster.intersectObjects(targets,false)[0],treasure=hit?this.treasures.find((item)=>item.id===hit.object.userData.treasureId):null;
     this.hoverTreasureId=treasure?.id||null;this.treasures.forEach((item)=>item.hovered=item===treasure);this.renderer.domElement.style.cursor=treasure?'pointer':'';if(activate&&treasure){event.preventDefault();this.beginTreasurePickup(treasure)}return treasure;
   }
 
@@ -135,21 +277,21 @@ export class Game {
 
   spawnEnemy(type=null,position=null,forcedAffixes=null){
     const progress=this.elapsed/TOTAL_TIME,pressure=acceleratedPressure(progress);type=type||chooseEnemyType(pressure);let template={...ENEMY_ARCHETYPES[type]};if(!template)return null;const affixes=rollEnemyAffixes(pressure,forcedAffixes);if(affixes.some((affix)=>affix.phaseStep))template={...template,phase:true,ai:'phase'};
-    const strength=(.72+pressure*.75+Math.pow(pressure,2)*1.75)*this.difficulty.health;const damageCurve=(.28+pressure*.22+Math.pow(pressure,2)*.75)*this.difficulty.damage;const angle=Math.random()*Math.PI*2;const radiusX=Math.max(11.5,Math.abs(this.camera.right)*.92);const radiusY=7.7;
+    const strength=(.72+pressure*.75+Math.pow(pressure,2)*1.75)*this.difficulty.health;const damageCurve=(.28+pressure*.22+Math.pow(pressure,2)*.75)*this.difficulty.damage;const angle=Math.random()*Math.PI*2;const radiusX=SPAWN_RADIUS_X,radiusY=SPAWN_RADIUS_Y;
     const multiply=(key)=>affixes.reduce((value,affix)=>value*(affix[key]||1),1);const sum=(key)=>affixes.reduce((value,affix)=>value+(affix[key]||0),0);const maximum=(key)=>affixes.reduce((value,affix)=>Math.max(value,affix[key]||0),0);
     const maxHp=template.hp*strength*multiply('health')*lawProduct(this.graveLaws,'enemy','health');const enemy={id:this.nextEntityId++,kind:'enemy',type,template,affixes,elite:affixes.length>0,affixColor:affixes[0]?.color||template.color,name:`${affixes.map((affix)=>affix.name).join(' ')}${affixes.length?' ':''}${template.name}`,maxHp,hp:maxHp,shield:maxHp*(sum('startingShield')+lawSum(this.graveLaws,'enemy','startingShield')),damage:template.damage*damageCurve*multiply('damage')*lawProduct(this.graveLaws,'enemy','damage'),speed:template.speed*(1+pressure*.16)*this.difficulty.speed*multiply('speed')*lawProduct(this.graveLaws,'enemy','speed'),maxAp:template.maxAp,ap:Math.random()*template.maxAp*.6,apRegen:template.regen*(1+pressure*.25)*multiply('regen')*lawProduct(this.graveLaws,'enemy','regen'),attackCost:template.attackCost*multiply('attackCost'),range:template.range,x:position?.x??Math.cos(angle)*radiusX,y:position?.y??Math.sin(angle)*radiusY,vx:0,vy:0,alive:true,aiState:'Rising',targetId:null,attackWindup:0,pendingTargetId:null,pendingTargetX:0,pendingTargetY:0,intentEffect:null,status:{burn:0,burnDps:0,bleed:0,bleedDps:0,slow:0,slowPower:0,stun:0,brittle:0,armorBreak:0,knockback:0},auraTimer:1.5+Math.random()*3,specialTimer:1+Math.random()*2,lifeSteal:sum('lifesteal'),deathBurst:maximum('deathBurst'),apDrain:sum('apDrain'),affixAuraRadius:maximum('auraRadius'),wardOnHit:sum('wardOnHit')+lawSum(this.graveLaws,'enemy','wardOnHit'),linkedGuard:maximum('linkedGuard'),dodge:sum('dodge')+lawSum(this.graveLaws,'enemy','dodge'),wardHitCooldown:0};
     enemy.mesh=createSkeletonVisual(enemy);this.scene.add(enemy.mesh);this.enemies.push(enemy);this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,enemy.affixColor,enemy.elite?11:5,enemy.elite?.9:.5));const discovered=discoverEnemy(this.chronicle,type,affixes.map((affix)=>affix.id));if(discovered){if(enemy.elite)this.feed(`<strong>${enemy.name}</strong> enters the archive.`,true);this.events.onDiscovery?.(this.snapshot())}return enemy;
   }
 
   spawnPack(pack,forced=false){
-    const positions=createFormationPositions(pack.types.length,this.camera.right,pack.formation),cohortId=this.nextCohortId++,spawned=pack.types.map((type,index)=>this.spawnEnemy(type,positions[index],forced?(pack.elites?.[index]||[]):null)).filter(Boolean),leader=spawned[0];spawned.forEach((enemy,index)=>{enemy.cohortId=cohortId;enemy.cohortSlot=index;enemy.cohortSize=spawned.length;enemy.cohortLeaderId=leader?.id||null;enemy.cohortFormation=pack.formation||'cluster';enemy.processionFury=0;enemy.cohortBroken=false});return spawned;
+    const positions=createFormationPositions(pack.types.length,pack.formation),cohortId=this.nextCohortId++,spawned=pack.types.map((type,index)=>this.spawnEnemy(type,positions[index],forced?(pack.elites?.[index]||[]):null)).filter(Boolean),leader=spawned[0];spawned.forEach((enemy,index)=>{enemy.cohortId=cohortId;enemy.cohortSlot=index;enemy.cohortSize=spawned.length;enemy.cohortLeaderId=leader?.id||null;enemy.cohortFormation=pack.formation||'cluster';enemy.processionFury=0;enemy.cohortBroken=false});return spawned;
   }
 
   triggerEncounter(encounter){
     if(!encounter||this.enemies.length+encounter.types.length>this.maxEnemies)return;const spawned=this.spawnPack(encounter,true);this.spawnWait=Math.max(this.spawnWait,5.5);this.currentEncounter={id:`minute-${encounter.minute}`,title:encounter.title,sigil:encounter.sigil,omen:encounter.omen,time:8};discoverEncounter(this.chronicle,this.currentEncounter.id);this.feed(`<strong>${encounter.title}</strong> — ${encounter.omen}`,true);this.events.onEncounter?.(this.currentEncounter,spawned);this.events.onDiscovery?.(this.snapshot());this.cameraShake=Math.max(this.cameraShake,.24);this.audio.play('ritualBell',{gain:.82});
   }
 
-  loop(){this.animationFrame=requestAnimationFrame(()=>this.loop());const dt=Math.min(.05,this.clock.getDelta());if(this.running&&!this.paused&&!this.modalPaused&&!this.ended)this.update(dt);this.render(performance.now())}
+  loop(){this.animationFrame=requestAnimationFrame(()=>this.loop());const dt=Math.min(.05,this.clock.getDelta());this.updateCameraControls(dt);if(this.running&&!this.paused&&!this.modalPaused&&!this.ended)this.update(dt);this.render(performance.now())}
 
   update(dt){
     this.elapsed+=dt;const progress=this.elapsed/TOTAL_TIME,pressure=acceleratedPressure(progress);if(this.elapsed>=TOTAL_TIME){this.end(true);return}
@@ -354,15 +496,15 @@ export class Game {
   updateEffects(dt){this.effects=this.effects.filter((effect)=>{if(effect.update(dt)){effect.destroy();return false}return true})}
   cleanup(){this.enemies=this.enemies.filter((enemy)=>{if(enemy.alive)return true;this.scene.remove(enemy.mesh);enemy.mesh.traverse((child)=>{child.geometry?.dispose?.();if(child.material){if(Array.isArray(child.material))child.material.forEach((material)=>material.dispose());else child.material.dispose()}});return false})}
 
-  openUpgrade(carrierId=null){if(carrierId)this.selectedId=carrierId;this.modalPaused=true;const choices=getUpgradeChoices(3,{progress:this.elapsed/TOTAL_TIME});this.events.onUpgrade?.(choices,this.snapshot());this.feed('A page tears itself from the claimed reliquary.',true)}
+  openUpgrade(carrierId=null){if(carrierId)this.selectedId=carrierId;this.setModalPaused(true);const choices=getUpgradeChoices(3,{progress:this.elapsed/TOTAL_TIME});this.events.onUpgrade?.(choices,this.snapshot());this.feed('A page tears itself from the claimed reliquary.',true)}
   applyUpgrade(upgrade,unitId){const unit=this.units.find((item)=>item.id===unitId&&item.alive);if(!unit)return null;upgrade.apply(unit);unit.hp=Math.min(unit.maxHp,unit.hp+unit.maxHp*.1);unit.shield+=unit.maxHp*.04;unit.ap=Math.min(unit.maxAp,unit.ap+unit.maxAp*.25);this.appliedUpgradeIds.add(upgrade.id);discoverRite(this.chronicle,upgrade.id);this.selectedId=unit.id;this.audio.play('upgradeBinding');this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd6504f,20,1.5,'ritual'));this.feed(`<strong>${unit.name}</strong> receives ${upgrade.shortName}; the binding rekindles flesh, ward, and will.`,true);const snapshot=this.snapshot();this.events.onRoster?.(snapshot);this.events.onHud?.(snapshot);this.events.onDiscovery?.(snapshot);return unit}
   reorderAbility(unitId,from,to){const unit=this.units.find((item)=>item.id===unitId);if(!unit||to<0||to>=unit.abilities.length)return null;const current=unit.abilities[unit.abilityCursor],[ability]=unit.abilities.splice(from,1);unit.abilities.splice(to,0,ability);unit.abilityCursor=Math.max(0,unit.abilities.indexOf(current));this.events.onRoster?.(this.snapshot());return unit}
-  resumeAfterUpgrade(){this.modalPaused=false}
+  resumeAfterUpgrade(){this.setModalPaused(false)}
   feed(message,important=false){this.events.onFeed?.(message,important)}
-  end(victory){if(this.ended)return;this.ended=true;this.running=false;this.audio.play(victory?'ritualBell':'heroWound',{gain:1.25,rate:victory ? 0.92 : 0.82});const result={victory,kills:this.killCount,upgrades:this.appliedUpgradeIds.size,units:this.units.filter((unit)=>unit.alive).length,elapsed:this.elapsed,difficulty:this.difficultyLevel,lawIds:this.graveLaws.map((law)=>law.id)};recordRun(this.chronicle,result);this.events.onDiscovery?.(this.snapshot());this.events.onEnd?.({...result,chronicle:this.chronicle})}
+  end(victory){if(this.ended)return;this.ended=true;this.running=false;this.clearCameraInput();this.notifyCameraChanged();this.audio.play(victory?'ritualBell':'heroWound',{gain:1.25,rate:victory ? 0.92 : 0.82});const result={victory,kills:this.killCount,upgrades:this.appliedUpgradeIds.size,units:this.units.filter((unit)=>unit.alive).length,elapsed:this.elapsed,difficulty:this.difficultyLevel,lawIds:this.graveLaws.map((law)=>law.id)};recordRun(this.chronicle,result);this.events.onDiscovery?.(this.snapshot());this.events.onEnd?.({...result,chronicle:this.chronicle})}
   snapshot(){
     const progress=clamp(this.elapsed/TOTAL_TIME,0,1),pressureProgress=acceleratedPressure(progress),livingEnemies=this.enemies.filter((enemy)=>enemy.alive),windups=livingEnemies.filter((enemy)=>enemy.attackWindup>0);
     return{elapsed:this.elapsed,remaining:Math.max(0,TOTAL_TIME-this.elapsed),progress,pressureProgress,bell:Math.min(20,Math.floor(this.elapsed/60)+1),kills:this.killCount,selectedId:this.selectedId,paused:this.paused,upgradeCount:this.appliedUpgradeIds.size,codexSize:UPGRADE_CATALOG.length,abilityCount:24,originCount:12,enemyArchetypes:Object.keys(ENEMY_ARCHETYPES).length,enemyAffixes:ENEMY_AFFIXES.length,graveLawCount:GRAVE_LAWS.length,graveLaws:this.graveLaws,difficulty:this.difficultyLevel,difficultyName:this.difficulty.name,threat:Math.min(7,Math.floor(pressureProgress*7)+1),enemyCount:livingEnemies.length,eliteCount:livingEnemies.filter((enemy)=>enemy.elite).length,meleeIntents:windups.filter((enemy)=>!enemy.template.ranged).length,rangedIntents:windups.filter((enemy)=>enemy.template.ranged).length,supportCount:livingEnemies.filter((enemy)=>enemy.template.aura||enemy.template.bishop||enemy.template.standard).length,zoneCount:this.zones.length,treasureCount:this.treasures.length,pendingTreasureDrops:this.pendingTreasureDrops,currentEncounter:this.currentEncounter,chronicle:this.chronicle,units:this.units}
   }
-  render(time){if(this.headless)return;this.arena.update(time,this.elapsed/TOTAL_TIME);this.units.forEach((unit)=>{if(unit.alive)updateEntityVisual(unit,unit.id===this.selectedId,time)});this.enemies.forEach((enemy)=>{if(enemy.alive)updateEntityVisual(enemy,false,time)});this.treasures.forEach((treasure)=>updateTreasureVisual(treasure,time));if(this.cameraShake>0){this.cameraShake=Math.max(0,this.cameraShake-.018);this.camera.position.x=(Math.random()-.5)*this.cameraShake;this.camera.position.y=(Math.random()-.5)*this.cameraShake}else{this.camera.position.x=0;this.camera.position.y=0}this.renderer.render(this.scene,this.camera)}
+  render(time){if(this.headless)return;this.arena.update(time,this.elapsed/TOTAL_TIME);this.units.forEach((unit)=>{if(unit.alive)updateEntityVisual(unit,unit.id===this.selectedId,time)});this.enemies.forEach((enemy)=>{if(enemy.alive)updateEntityVisual(enemy,false,time)});this.treasures.forEach((treasure)=>updateTreasureVisual(treasure,time));let shakeX=0,shakeY=0;if(this.cameraShake>0){this.cameraShake=Math.max(0,this.cameraShake-.018);shakeX=(Math.random()-.5)*this.cameraShake;shakeY=(Math.random()-.5)*this.cameraShake}this.applyCameraTransform(shakeX,shakeY);this.renderer.render(this.scene,this.camera);if(this.interfaceLayer){const autoClear=this.renderer.autoClear;this.renderer.clearDepth();this.renderer.autoClear=false;try{this.interfaceLayer.render?.(this.renderer,time)}finally{this.renderer.autoClear=autoClear}}}
 }
