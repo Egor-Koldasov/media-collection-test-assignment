@@ -106,11 +106,11 @@ function showEncounter(encounter){
 }
 
 function openArchive(){
-  archivePreviousModalPause=game.modalPaused;game.setModalPaused(true);renderArchive(game.snapshot());shell.inert=true;archive.inert=false;archive.removeAttribute('aria-hidden');archive.classList.add('is-visible');queueMicrotask(()=>$('#archive-close').focus({preventScroll:true}));
+  archivePreviousModalPause=game.modalPaused;game.setModalPaused(true);const snapshot=game.snapshot();renderArchive(snapshot);shell.inert=false;archive.inert=true;archive.setAttribute('aria-hidden','true');archive.classList.remove('is-visible');game.hud?.showOverlay('archive',{snapshot,tab:'graveborn'});game.renderer?.domElement?.focus({preventScroll:true});
 }
 
 function closeArchive(){
-  archive.classList.remove('is-visible');const modalVisible=modal.classList.contains('is-visible');shell.inert=modalVisible;const returnTarget=modalVisible?modalContent.querySelector('button:not([disabled])'):$('#archive-button');returnTarget?.focus({preventScroll:true});archive.inert=true;archive.setAttribute('aria-hidden','true');game.setModalPaused(archivePreviousModalPause);
+  archive.classList.remove('is-visible');shell.inert=false;archive.inert=true;archive.setAttribute('aria-hidden','true');game.hud?.hideOverlay();game.renderer?.domElement?.focus({preventScroll:true});game.setModalPaused(archivePreviousModalPause);
 }
 
 function renderRoster(snapshot) {
@@ -182,16 +182,16 @@ function roman(number) {
 
 function showModal() {
   inspectedAbilityIndex=null;inspectedUnitId=null;hideAbilityInspector();
-  shell.inert=true;
-  modal.inert=false;
-  modal.removeAttribute('aria-hidden');
+  shell.inert=false;
+  modal.inert=true;
+  modal.setAttribute('aria-hidden','true');
   modal.classList.add('is-visible');
-  queueMicrotask(()=>modalContent.querySelector('button:not([disabled])')?.focus({preventScroll:true}));
+  queueMicrotask(()=>game?.renderer?.domElement?.focus({preventScroll:true}));
 }
 function hideModal() {
   modal.classList.remove('is-visible');
   shell.inert=false;
-  if(modal.contains(document.activeElement)){document.activeElement.blur();game?.renderer?.domElement?.focus({preventScroll:true})}
+  game?.hud?.hideOverlay();game?.renderer?.domElement?.focus({preventScroll:true});
   modal.inert=true;
   modal.setAttribute('aria-hidden','true');
 }
@@ -214,7 +214,7 @@ function renderUpgradeChoices(choices,snapshot) {
   modalContent.innerHTML=`<p class="chapter">BELL ${roman(snapshot.bell)} · RELIQUARY CLAIMED</p><h2>Choose one truth to make real.</h2><p>The selected oathbound at left receives whichever rite you choose. Select another to inspect and change the bearer.</p><div class="upgrade-decision-layout"><aside id="upgrade-company-readout" class="upgrade-company-readout"></aside><div class="upgrade-grid">${choices.map((upgrade,index)=>`<button class="upgrade-card tier-${upgrade.rarity} inflection-${upgrade.inflectionId}" type="button" data-upgrade="${index}" data-rune="${upgrade.rune}"><span class="card-top"><span>${upgrade.family} · ${upgrade.inflectionLabel}</span><span class="rarity-pips">${'◆'.repeat(upgrade.rarity)}${'◇'.repeat(4-upgrade.rarity)}</span></span><span class="${upgradeArtClass(upgrade)}" style="${upgradeArtStyle(upgrade)}" role="img" aria-label="Illustration for ${upgrade.shortName}"><i>${upgrade.sigil}</i><b>${upgrade.rune}</b></span><h3>${upgrade.name}</h3><p>${upgrade.description}</p><footer>Bind to <b data-upgrade-bearer></b> <span>→</span></footer></button>`).join('')}</div></div>`;
   renderUpgradeCompanyReadout(snapshot);
   modalContent.querySelectorAll('[data-upgrade]').forEach((button)=>button.addEventListener('click',()=>{const upgrade=choices[Number(button.dataset.upgrade)],unit=game.applyUpgrade(upgrade,upgradeUnitId);if(!unit)return;hideModal();game.resumeAfterUpgrade()}));
-  showModal();
+  showModal();game.hud?.showOverlay('upgrade',{choices,snapshot,selectedUnitId:upgradeUnitId});
 }
 
 function renderOrderChoice(unit) {
@@ -223,14 +223,36 @@ function renderOrderChoice(unit) {
   $('#seal-order').addEventListener('click',closeOrderEditor);
 }
 
-function openOrderEditor(){const unit=game.units.find((item)=>item.id===game.selectedId&&item.alive);if(!unit||unit.abilities.length<2)return;game.setModalPaused(true);modalBackdrop.classList.remove('concept-backdrop');renderOrderChoice(unit);showModal()}
+function openOrderEditor(){const unit=game.units.find((item)=>item.id===game.selectedId&&item.alive);if(!unit||unit.abilities.length<2)return;game.setModalPaused(true);modalBackdrop.classList.remove('concept-backdrop');renderOrderChoice(unit);showModal();game.hud?.showOverlay('order',{unit})}
 function closeOrderEditor(){if(!orderEditorOpen)return;orderEditorOpen=false;hideModal();game.setModalPaused(false)}
 
 function renderOutcome(result) {
   if(result.victory){$('#clock').textContent='00:00';$('#clock-progress').style.width='100%';$('#clock-label').textContent='BELL XX · THE TWENTIETH BELL'}
   modalBackdrop.classList.remove('concept-backdrop');modalContent.className='modal-content outcome-card';
   const laws=(result.lawIds||[]).map((id)=>GRAVE_LAWS.find((law)=>law.id===id)).filter(Boolean);modalContent.innerHTML=`<div class="result-glyph">${result.victory?'✦':'☠'}</div><p class="chapter">${result.victory?'THE TWENTIETH BELL SOUNDS':'THE RITUAL IS BROKEN'}</p><h2>${result.victory?'Dawn remembers you.':'The circle is empty.'}</h2><p>${result.victory?'For one night, the grave has learned restraint. It will forget by tomorrow.':'Every oathbound has fallen. The dead, being dead, have nowhere else to be.'}</p><div class="result-laws">${laws.map((law)=>`<span style="--law-color:#${law.color.toString(16).padStart(6,'0')}">${law.sigil} ${law.shortName}</span>`).join('')}</div><div class="result-stats"><div><strong>${result.kills}</strong><span>remains</span></div><div><strong>${result.upgrades}</strong><span>rites bound</span></div><div><strong>${result.units}</strong><span>survivors</span></div></div><button id="restart-button" class="primary-button" type="button"><span>Begin another company</span><i>↻</i></button>`;
-  $('#restart-button').addEventListener('click',()=>window.location.reload());showModal();
+  $('#restart-button').addEventListener('click',()=>window.location.reload());showModal();game.hud?.showOverlay('outcome',{result});
+}
+
+function handleOverlayAction(action,payload){
+  if(action==='overlayDifficultyDelta'){
+    difficultySlider.value=String(Math.max(1,Math.min(5,Number(difficultySlider.value)+Number(payload||0))));renderDifficulty();
+  }else if(action==='overlayStart'){
+    game.setDifficulty(Number(difficultySlider.value));game.start();
+  }else if(action==='overlayArchiveClose'){
+    closeArchive();
+  }else if(action==='overlayArchiveTab'){
+    game.hud.overlayScroll=0;game.hud.updateOverlay({tab:payload});
+  }else if(action==='overlayUpgradeUnit'){
+    upgradeUnitId=Number(payload);game.selectUnit(upgradeUnitId);game.hud.updateOverlay({selectedUnitId:upgradeUnitId,snapshot:game.snapshot()});
+  }else if(action==='overlayUpgradeChoose'){
+    const choices=game.hud.overlay?.data?.choices||[],upgrade=choices[Number(payload)],unit=game.applyUpgrade(upgrade,upgradeUnitId);if(unit){hideModal();game.resumeAfterUpgrade()}
+  }else if(action==='overlayOrderMove'){
+    const current=game.hud.overlay?.data?.unit;if(!current)return;game.reorderAbility(current.id,payload.from,payload.to);const unit=game.units.find((item)=>item.id===current.id);renderOrderChoice(unit);game.hud.updateOverlay({unit});
+  }else if(action==='overlayOrderClose'){
+    closeOrderEditor();
+  }else if(action==='overlayRestart'){
+    window.location.reload();
+  }
 }
 
 const game=new Game(stage,{
@@ -244,12 +266,13 @@ const game=new Game(stage,{
   onUpgrade:renderUpgradeChoices,
   onArchive:openArchive,
   onOrder:openOrderEditor,
+  onOverlayAction:handleOverlayAction,
   onPause:(paused)=>{pausedSeal.hidden=!paused;$('#pause-button').textContent=paused?'▶':'Ⅱ'},
   onEnd:renderOutcome
 });
 
 const difficultySlider=$('#difficulty-slider');
-function renderDifficulty(){const preset=game.setDifficulty(Number(difficultySlider.value));$('#difficulty-roman').textContent=preset.roman;$('#difficulty-name').textContent=preset.name.toUpperCase();$('#difficulty-detail').textContent=preset.detail;difficultySlider.setAttribute('aria-valuetext',`${preset.name}, level ${preset.level} of 5`)}
+function renderDifficulty(){const preset=game.setDifficulty(Number(difficultySlider.value));$('#difficulty-roman').textContent=preset.roman;$('#difficulty-name').textContent=preset.name.toUpperCase();$('#difficulty-detail').textContent=preset.detail;difficultySlider.setAttribute('aria-valuetext',`${preset.name}, level ${preset.level} of 5`);if(!game.running){const snapshot=game.snapshot(),pairKey=snapshot.graveLaws.map((law)=>law.id).sort().join('|'),record=snapshot.chronicle?.lawPairRecords?.[pairKey],recordText=record?`THIS PAIRING: ${record.runs} RITES · ${record.wins} DAWNS · DEEPEST BELL ${roman(record.bestBell)}`:'THIS PAIRING HAS NOT YET BEEN ENDURED';game.hud?.showOverlay('intro',{difficulty:preset,laws:snapshot.graveLaws,record:recordText})}}
 difficultySlider.addEventListener('input',renderDifficulty);renderDifficulty();
 $('#start-button').addEventListener('click',()=>{game.setDifficulty(Number(difficultySlider.value));game.start()});
 $('#archive-button').addEventListener('click',openArchive);
@@ -260,9 +283,9 @@ $('#reorder-button').addEventListener('click',openOrderEditor);
 $('#pause-button').addEventListener('click',()=>game.togglePause());
 $('#sound-button').addEventListener('click',(event)=>{const enabled=game.toggleSound();event.currentTarget.textContent=enabled?'♪':'×';event.currentTarget.title=enabled?'Mute sound':'Enable sound'});
 document.addEventListener('click',(event)=>{if(event.target.closest('button'))game.playUi()},{capture:true});
-window.addEventListener('keydown',(event)=>{if(event.key!=='Escape')return;if(archive.classList.contains('is-visible'))closeArchive();else if(orderEditorOpen)closeOrderEditor();else game.togglePause()});
+window.addEventListener('keydown',(event)=>{if(event.key!=='Escape')return;const overlay=game.hud?.overlay?.kind;if(overlay==='archive')closeArchive();else if(overlay==='order')closeOrderEditor();else if(!overlay)game.togglePause()});
 
 $('#codex-count').textContent=`${UPGRADE_CATALOG.length} rites remain unwritten`;
-window.__TWENTIETH_BELL__=game;
+shell.inert=false;modal.inert=true;modal.setAttribute('aria-hidden','true');archive.inert=true;archive.setAttribute('aria-hidden','true');window.__TWENTIETH_BELL__=game;
 renderArchive(game.snapshot());
 renderGraveLaws(game.snapshot());
