@@ -266,6 +266,7 @@ export class RitualInterface {
     this.pointerPress = null;
     this.clickCandidateId = null;
     this.inspectedAbility = null;
+    if (view === 'upgrade') this.choicePage = 0;
     this.dirty = true;
     return this;
   }
@@ -1228,7 +1229,7 @@ export class RitualInterface {
       this.ctx.clip();
       this.hitClip = clip;
       this._drawUpgradeBearerStrip(living, selected, x + 17, y + 74 - scroll, width - 34, portrait);
-      const cardOffset = portrait ? 158 : 142;
+      const cardOffset = portrait ? 184 : 174;
       const cardY = y + cardOffset - scroll;
       const choiceIndex = this.choicePage % Math.max(1, choices.length);
       const choice = choices[choiceIndex];
@@ -1257,8 +1258,11 @@ export class RitualInterface {
     ctx.font = '600 8px Cinzel, Georgia, serif';
     ctx.letterSpacing = '1.5px';
     ctx.fillText('BEARER OF THE NEW TRUTH', x, y);
-    const size = portrait ? 42 : 50;
-    const gap = 9;
+    const gap = portrait ? 7 : 9;
+    const detailReserve = portrait ? Math.min(110, width * .35) : 120;
+    const size = portrait
+      ? clamp((width - detailReserve - 14 - gap * Math.max(0, units.length - 1)) / Math.max(1, units.length), 28, 42)
+      : 50;
     units.forEach((unit, index) => {
       const unitX = x + index * (size + gap);
       this._drawAtlasCircle('roster', unit.portrait || 0, unitX, y + 12, size, colorString(unit.color), false);
@@ -1277,11 +1281,14 @@ export class RitualInterface {
       ctx.font = `700 ${portrait ? 11 : 13}px Cinzel, Georgia, serif`;
       ctx.letterSpacing = '0px';
       ctx.textAlign = 'right';
-      ctx.fillText(ellipsize(ctx, selected.name, Math.max(120, width - units.length * (size + gap))), x + width, y + 31);
+      const portraitSpan = units.length * (size + gap) - gap;
+      const detailWidth = Math.max(28, width - portraitSpan - 14);
+      ctx.fillText(ellipsize(ctx, selected.name, detailWidth), x + width, y + 31);
       ctx.fillStyle = COLORS.paperDim;
       ctx.font = 'italic 10px Georgia, serif';
-      ctx.fillText(`${selected.archetype} · ${selected.abilities?.length || 0} rites`, x + width, y + 48);
+      ctx.fillText(ellipsize(ctx, `${selected.archetype} · ${selected.abilities?.length || 0} ${(selected.abilities?.length || 0) === 1 ? 'rite' : 'rites'}`, detailWidth), x + width, y + 48);
       ctx.textAlign = 'left';
+      this._drawUpgradeAbilityRibbon(selected, x, y + (portrait ? 60 : 68), width, portrait);
     }
   }
 
@@ -1327,7 +1334,116 @@ export class RitualInterface {
       ctx.fillStyle = COLORS.paperDim;
       ctx.font = 'italic 10px Georgia, serif';
       ctx.fillText(`${Math.ceil(selected.hp || 0)}/${Math.ceil(selected.maxHp || 0)} health · ${Math.floor(selected.ap || 0)}/${Math.floor(selected.maxAp || 0)} AP`, x, rowY + 42);
+      const abilityY = rowY + 60;
+      this._drawUpgradeAbilityLedger(selected, x, abilityY, width, Math.max(0, y + height - abilityY));
     }
+  }
+
+  _drawUpgradeAbilityRibbon(unit, x, y, width, compact) {
+    const abilities = unit?.abilities || [];
+    if (!abilities.length || width < 120) return;
+    const ctx = this.ctx;
+    const iconSize = compact ? 22 : 24;
+    const gap = 6;
+    const labelWidth = compact ? 48 : 60;
+    const available = Math.max(0, width - labelWidth);
+    const shown = abilities.slice(0, Math.max(1, Math.floor((available + gap) / (iconSize + gap))));
+    ctx.save();
+    ctx.fillStyle = COLORS.paperDim;
+    ctx.font = `600 ${compact ? 7 : 8}px Cinzel, Georgia, serif`;
+    ctx.letterSpacing = '1.2px';
+    ctx.fillText('LITANY', x, y + 15);
+    shown.forEach((ability, index) => {
+      const iconX = x + labelWidth + index * (iconSize + gap);
+      const current = index === unit.abilityCursor;
+      ctx.fillStyle = 'rgba(5,7,9,.92)';
+      ctx.fillRect(iconX, y, iconSize, iconSize);
+      this._drawAtlasContained('abilities', ability.artIndex ?? 0, iconX + 1, y + 1, iconSize - 2, iconSize - 2, .94);
+      ctx.strokeStyle = current ? colorString(ability.color, COLORS.bloodBright) : 'rgba(185,149,93,.44)';
+      ctx.lineWidth = current ? 1.5 : 1;
+      ctx.strokeRect(iconX + .5, y + .5, iconSize - 1, iconSize - 1);
+      ctx.fillStyle = current ? COLORS.bloodBright : COLORS.parchment;
+      ctx.font = `700 ${compact ? 6 : 7}px Cinzel, Georgia, serif`;
+      ctx.letterSpacing = '0px';
+      ctx.fillText(roman(index + 1), iconX + 3, y + iconSize - 3);
+    });
+    const finalIconX = x + labelWidth + shown.length * (iconSize + gap);
+    const nameWidth = x + width - finalIconX;
+    if (abilities.length === 1 && nameWidth > 72) {
+      const ability = abilities[0];
+      ctx.fillStyle = COLORS.bone;
+      ctx.font = `700 ${compact ? 8 : 9}px Cinzel, Georgia, serif`;
+      ctx.fillText(ellipsize(ctx, ability.name, nameWidth - 5), finalIconX, y + 10);
+      ctx.fillStyle = colorString(ability.color, COLORS.gold);
+      ctx.font = `600 ${compact ? 7 : 8}px Cinzel, Georgia, serif`;
+      ctx.fillText(`${Math.round((ability.cost || 0) * (unit.mods?.cost || 1))} AP · NEXT`, finalIconX, y + 21);
+    }
+    ctx.restore();
+  }
+
+  _drawUpgradeAbilityLedger(unit, x, y, width, height) {
+    const abilities = unit?.abilities || [];
+    if (!abilities.length || height < 52) return;
+    const ctx = this.ctx;
+    const gap = 7;
+    const headingHeight = 22;
+    const available = height - headingHeight - gap * Math.max(0, abilities.length - 1);
+    const rowHeight = clamp(Math.floor(available / abilities.length), 42, 104);
+    const visibleCount = Math.min(abilities.length, Math.max(1, Math.floor((height - headingHeight + gap) / (rowHeight + gap))));
+    ctx.save();
+    ctx.fillStyle = COLORS.paperDim;
+    ctx.font = '600 8px Cinzel, Georgia, serif';
+    ctx.letterSpacing = '1.5px';
+    ctx.fillText('CURRENT ORDERED LITANY', x, y + 10);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = COLORS.bloodBright;
+    ctx.font = '600 7px Cinzel, Georgia, serif';
+    ctx.fillText(`NEXT · ${roman((unit.abilityCursor || 0) + 1)}`, x + width, y + 10);
+    ctx.textAlign = 'left';
+    abilities.slice(0, visibleCount).forEach((ability, index) => {
+      const rowY = y + headingHeight + index * (rowHeight + gap);
+      const current = index === unit.abilityCursor;
+      const condensed = rowHeight < 62;
+      const iconSize = clamp(rowHeight - (condensed ? 8 : 16), 30, 76);
+      ctx.fillStyle = current ? 'rgba(52,28,27,.84)' : 'rgba(5,7,9,.76)';
+      ctx.fillRect(x, rowY, width, rowHeight);
+      ctx.strokeStyle = current ? colorString(ability.color, COLORS.bloodBright) : 'rgba(185,149,93,.25)';
+      ctx.lineWidth = current ? 1.4 : 1;
+      ctx.strokeRect(x + .5, rowY + .5, width - 1, rowHeight - 1);
+      const iconX = x + 8;
+      const iconY = rowY + (rowHeight - iconSize) * .5;
+      ctx.fillStyle = '#08090a';
+      ctx.fillRect(iconX, iconY, iconSize, iconSize);
+      this._drawAtlasContained('abilities', ability.artIndex ?? 0, iconX + 1, iconY + 1, iconSize - 2, iconSize - 2, .96);
+      ctx.strokeStyle = current ? colorString(ability.color, COLORS.bloodBright) : 'rgba(185,149,93,.38)';
+      ctx.strokeRect(iconX + .5, iconY + .5, iconSize - 1, iconSize - 1);
+      ctx.fillStyle = current ? COLORS.bloodBright : COLORS.gold;
+      ctx.font = '700 7px Cinzel, Georgia, serif';
+      ctx.fillText(roman(index + 1), iconX + 4, iconY + 10);
+      const copyX = iconX + iconSize + 10;
+      const copyWidth = Math.max(20, width - (copyX - x) - 8);
+      ctx.fillStyle = COLORS.bone;
+      ctx.font = `700 ${width < 290 ? 9 : 10}px Cinzel, Georgia, serif`;
+      ctx.fillText(ellipsize(ctx, ability.name || 'Unnamed rite', copyWidth), copyX, rowY + (condensed ? 15 : 20));
+      ctx.fillStyle = current ? colorString(ability.color, COLORS.bloodBright) : COLORS.paperDim;
+      ctx.font = '600 7px Cinzel, Georgia, serif';
+      const cost = Math.round((ability.cost || 0) * (unit.mods?.cost || 1));
+      const recovery = ((ability.cooldown || 0) * (unit.mods?.cooldown || 1)).toFixed(2);
+      ctx.fillText(`${(ability.category || ability.kind || 'RITE').toUpperCase()} · ${cost} AP · ${recovery}s`, copyX, rowY + (condensed ? 30 : 37));
+      if (rowHeight >= 74) {
+        ctx.fillStyle = COLORS.paperDim;
+        ctx.font = 'italic 9px Georgia, serif';
+        wrapLines(ctx, ability.detail || '', copyWidth, rowHeight >= 98 ? 3 : 2).forEach((line, lineIndex) => {
+          ctx.fillText(line, copyX, rowY + 55 + lineIndex * 12);
+        });
+      }
+    });
+    if (visibleCount < abilities.length) {
+      ctx.fillStyle = COLORS.paperDim;
+      ctx.font = 'italic 8px Georgia, serif';
+      ctx.fillText(`+ ${abilities.length - visibleCount} further ${(abilities.length - visibleCount) === 1 ? 'verse' : 'verses'}`, x, y + height - 3);
+    }
+    ctx.restore();
   }
 
   _drawUpgradeCard(upgrade, index, x, y, width, height, selected, portrait) {
@@ -1346,10 +1462,10 @@ export class RitualInterface {
     ctx.lineWidth = hot ? 2 : 1;
     ctx.stroke();
     const artMargin = portrait ? 22 : 10;
-    const artHeight = portrait ? Math.min(245, height * .45) : Math.min(height * .43, width * .93);
     const artX = x + artMargin;
     const artY = y + 32;
     const artWidth = width - artMargin * 2;
+    const artHeight = Math.max(84, Math.min(artWidth, height - (portrait ? 199 : 173)));
     const asset = (upgrade.artIndex ?? 0) < 25 ? 'upgradesA' : 'upgradesB';
     const artIndex = asset === 'upgradesA' ? (upgrade.artIndex ?? index) : (upgrade.artIndex ?? index) - 25;
     ctx.save();
@@ -1357,10 +1473,15 @@ export class RitualInterface {
     ctx.clip();
     ctx.fillStyle = '#09090a';
     ctx.fillRect(artX, artY, artWidth, artHeight);
-    this._drawAtlas(asset, artIndex, artX, artY, artWidth, artHeight, .94);
-    const shade = ctx.createLinearGradient(artX, artY + artHeight * .5, artX, artY + artHeight);
+    const matte = ctx.createRadialGradient(artX + artWidth * .5, artY + artHeight * .46, 0, artX + artWidth * .5, artY + artHeight * .46, Math.max(artWidth, artHeight) * .62);
+    matte.addColorStop(0, 'rgba(62,46,34,.24)');
+    matte.addColorStop(1, 'rgba(2,3,4,.92)');
+    ctx.fillStyle = matte;
+    ctx.fillRect(artX, artY, artWidth, artHeight);
+    this._drawAtlasContained(asset, artIndex, artX + 2, artY + 2, artWidth - 4, artHeight - 4, .97);
+    const shade = ctx.createLinearGradient(artX, artY + artHeight * .7, artX, artY + artHeight);
     shade.addColorStop(0, 'rgba(5,5,6,0)');
-    shade.addColorStop(1, 'rgba(5,5,6,.84)');
+    shade.addColorStop(1, 'rgba(5,5,6,.56)');
     ctx.fillStyle = shade;
     ctx.fillRect(artX, artY, artWidth, artHeight);
     ctx.restore();
@@ -2000,6 +2121,36 @@ export class RitualInterface {
     this.ctx.save();
     this.ctx.globalAlpha *= alpha;
     this._drawImageCellCover(asset.image, column * cellWidth, row * cellHeight, cellWidth, cellHeight, x, y, width, height);
+    this.ctx.restore();
+    return true;
+  }
+
+  _drawAtlasContained(name, index, x, y, width, height, alpha = 1) {
+    const asset = this.assets[name];
+    if (!asset?.loaded || width <= 0 || height <= 0) return false;
+    const safeIndex = Math.max(0, Number(index) || 0);
+    const column = safeIndex % asset.columns;
+    const row = Math.floor(safeIndex / asset.columns) % asset.rows;
+    const cellWidth = asset.image.naturalWidth / asset.columns;
+    const cellHeight = asset.image.naturalHeight / asset.rows;
+    const scale = Math.min(width / cellWidth, height / cellHeight);
+    const drawWidth = cellWidth * scale;
+    const drawHeight = cellHeight * scale;
+    const drawX = x + (width - drawWidth) * .5;
+    const drawY = y + (height - drawHeight) * .5;
+    this.ctx.save();
+    this.ctx.globalAlpha *= alpha;
+    this.ctx.drawImage(
+      asset.image,
+      column * cellWidth,
+      row * cellHeight,
+      cellWidth,
+      cellHeight,
+      drawX,
+      drawY,
+      drawWidth,
+      drawHeight
+    );
     this.ctx.restore();
     return true;
   }

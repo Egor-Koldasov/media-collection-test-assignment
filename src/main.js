@@ -144,9 +144,9 @@ function closeOrderEditor(){
   setView('play');
 }
 
-function chooseUpgrade(index){
+function chooseUpgrade(index,requestedUnitId=upgradeUnitId){
   const upgrade=typeof index==='object'?index:upgradeChoices[Number(index)];
-  const unit=game.applyUpgrade(upgrade,upgradeUnitId);
+  const unit=game.applyUpgrade(upgrade,Number(requestedUnitId));
   if(!unit)return;
   upgradeChoices=[];
   upgradeUnitId=null;
@@ -308,7 +308,13 @@ function syncAccessibility(state){
     label.append(input);
     accessibleControls.append(label,makeButton('Strike the first bell','start'));
   }else if(view==='upgrade'){
-    living.forEach((unit)=>accessibleControls.append(makeButton(`Select ${unit.name} as upgrade bearer`,'chooseUpgradeUnit',unit.id)));
+    const bearer=living.find((unit)=>unit.id===upgradeUnitId)||selected||living[0];
+    if(bearer){
+      const litany=document.createElement('p');
+      litany.textContent=`${bearer.name}'s ordered abilities: ${bearer.abilities.map((ability,index)=>`${index+1}, ${ability.name}, ${Math.round((ability.cost||0)*(bearer.mods?.cost||1))} AP${index===bearer.abilityCursor?', next to cast':''}`).join('. ')}.`;
+      accessibleControls.append(litany);
+    }
+    living.forEach((unit)=>accessibleControls.append(makeButton(`Select ${unit.name} as upgrade bearer. Ordered abilities: ${unit.abilities.map((ability)=>ability.name).join(', ')}.`,'chooseUpgradeUnit',unit.id)));
     upgradeChoices.forEach((upgrade,index)=>accessibleControls.append(makeButton(`Bind ${upgrade.name}. ${upgrade.description}`,'chooseUpgrade',index)));
   }else if(view==='order'){
     const unit=game.units.find((item)=>item.id===orderUnitId);
