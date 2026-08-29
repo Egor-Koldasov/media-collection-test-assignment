@@ -201,7 +201,7 @@ export class Game {
       this.audio.play('ritualBell',{gain:benediction?1:.78});this.arena.pulse?.(bell);this.arena.setBell?.(bell);this.feed(benediction?`<strong>${benediction.title}</strong> — ${benediction.omen}`:'The bell rekindles every unbroken oath.',!!benediction);this.triggerEncounter(getBellEncounter(bell));if(benediction)this.events.onMilestone?.(benediction,this.snapshot());
     }
     while(this.upgradeDropIndex<UPGRADE_DROP_TIMES.length&&this.elapsed>=this.nextUpgrade){this.pendingTreasureDrops+=1;this.upgradeDropIndex+=1;this.nextUpgrade=UPGRADE_DROP_TIMES[this.upgradeDropIndex]??Infinity;this.feed('A graveborn somewhere in the procession now carries an open reliquary.',true)}
-    this.updateDeferred(dt);this.updateZones(dt);this.updateTreasures(dt);this.updateHeroes(dt);if(!this.modalPaused)this.updateEnemies(dt);this.updateCombatText(dt);this.updateEffects(dt);this.cleanup();
+    this.updateDeferred(dt);this.updateZones(dt);this.updateTreasures(dt);this.updateHeroes(dt);if(!this.modalPaused)this.updateEnemies(dt);this.updateDeaths(dt);this.updateCombatText(dt);this.updateEffects(dt);this.cleanup();
     if(!this.units.some((unit)=>unit.alive)){this.end(false);return}
     if(this.elapsed-this.lastHud>.1){this.lastHud=this.elapsed;this.events.onHud?.(this.snapshot())}
     if(this.elapsed-this.lastOmen>22){this.lastOmen=this.elapsed;const omens=['Iron tastes sweet in the fog.','Something vast shifts below the stones.','The candles bend toward the east.','No bell rope moves, yet bronze is singing.','The dead have learned the company’s names.','A ribcage runs where no dog remains.','The ink on the Blood Book is still wet.','A second moon appears in a shield’s reflection.'];this.feed(omens[Math.floor(Math.random()*omens.length)])}
@@ -331,7 +331,7 @@ export class Game {
   }
 
   killEnemy(enemy,source){
-    if(!enemy.alive)return;enemy.alive=false;enemy.intentEffect?.cancel?.();enemy.intentEffect=null;if(source){source.kills+=1;source.ap=Math.min(source.maxAp,source.ap+source.mods.killAp);this.heal(source,source.mods.killHeal,false)}this.killCount+=enemy.template.score*(1+enemy.affixes.length);
+    if(!enemy.alive)return;enemy.alive=false;enemy.deathAge=0;enemy.deathVisualDone=this.headless;enemy.deathBodyScaleY=enemy.mesh?.userData?.body?.scale?.y||1;enemy.deathBodyY=enemy.mesh?.userData?.body?.position?.y||0;enemy.intentEffect?.cancel?.();enemy.intentEffect=null;if(source){source.kills+=1;source.ap=Math.min(source.maxAp,source.ap+source.mods.killAp);this.heal(source,source.mods.killHeal,false)}this.killCount+=enemy.template.score*(1+enemy.affixes.length);
     const tithe=lawSum(this.graveLaws,'run','onKillHeal');if(tithe>0){const weakest=this.units.filter((unit)=>unit.alive).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(weakest)this.heal(weakest,weakest.maxHp*tithe,false)}
     if(source?.mods?.plagueSpread>0&&(enemy.status.burn>0||enemy.status.bleed>0||enemy.status.brittle>0)){const spread=source.mods.plagueSpread;this.enemies.filter((other)=>other.alive&&other!==enemy&&distance(enemy,other)<2.4).forEach((other)=>{if(enemy.status.burn>0){other.status.burn=Math.max(other.status.burn,enemy.status.burn*.55);other.status.burnDps=Math.max(other.status.burnDps,enemy.status.burnDps*spread);other.status.burnSourceId=source.id}if(enemy.status.bleed>0){other.status.bleed=Math.max(other.status.bleed,enemy.status.bleed*.55);other.status.bleedDps=Math.max(other.status.bleedDps,enemy.status.bleedDps*spread);other.status.bleedSourceId=source.id}if(enemy.status.brittle>0)other.status.brittle=Math.max(other.status.brittle,enemy.status.brittle*.55)});this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0x8c775f,11,1.25))}
     if(enemy.status.curse>0){const curseSource=this.units.find((unit)=>unit.id===enemy.status.curseSourceId&&unit.alive)||source;this.enemies.filter((other)=>other.alive&&other!==enemy&&distance(enemy,other)<2.3).forEach((other)=>{this.damageEnemy(other,enemy.status.cursePower,curseSource,false);other.status.curse=Math.max(other.status.curse,4);other.status.cursePower=enemy.status.cursePower*.65;other.status.curseSourceId=curseSource?.id});this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0x9a66a7,16,1.7,'curse'))}
@@ -339,10 +339,14 @@ export class Game {
     if(enemy.template.splits){for(let i=0;i<enemy.template.splits;i+=1){const angle=i/enemy.template.splits*Math.PI*2;this.spawnEnemy('thrall',{x:enemy.x+Math.cos(angle)*.45,y:enemy.y+Math.sin(angle)*.45},[])}}
     if(this.pendingTreasureDrops>0){this.pendingTreasureDrops-=1;this.spawnTreasure(enemy.x,enemy.y)}
     if(enemy.elite)this.feed(`<strong>${enemy.name}</strong> is broken.`,true);
-    this.effects.push(createParticleBurst(this.scene,enemy.x,enemy.y,0xb8aa95,8,.8));this.effects.push(createBurst(this.scene,enemy.x,enemy.y,0xb74147,.9));this.effects.push(createCorpseDecal(this.scene,enemy.x,enemy.y,enemy.type));this.audio.play('skeletonDeath',{gain:enemy.template.giant?1.24:1});
+    this.effects.push(createCorpseDecal(this.scene,enemy.x,enemy.y,enemy.type));this.audio.play('skeletonDeath',{gain:enemy.template.giant?1.24:1});
   }
 
   heal(unit,amount,show=true){if(!unit?.alive||amount<=0)return;const missing=Math.max(0,unit.maxHp-unit.hp);const actual=Math.min(amount,missing);const overflow=Math.max(0,amount-actual);unit.hp=Math.min(unit.maxHp,unit.hp+amount);if(overflow>0&&unit.mods.overhealWard>0)unit.shield+=overflow*unit.mods.overhealWard;if(show&&actual>.2)this.queueCombatNumber(unit,actual,{kind:'heal',prefix:'+'})}
+
+  updateDeaths(dt){
+    if(this.headless)return;for(const enemy of this.enemies){if(enemy.alive||enemy.deathVisualDone||!enemy.mesh)continue;enemy.deathAge=(enemy.deathAge||0)+dt;const t=Math.min(1,enemy.deathAge/.28),settle=1-Math.pow(1-t,3),data=enemy.mesh.userData,body=data.body,spriteUniforms=data.sprite?.userData?.spriteUniforms;if(enemy.deathAge<=dt+.001)[data.hp,data.ap,data.statusRing,data.shieldRing,data.eliteRing,data.crown].forEach((object)=>{if(object)object.visible=false});if(body){body.scale.y=enemy.deathBodyScaleY*(1-settle*.82);body.position.y=enemy.deathBodyY-settle*.56}if(spriteUniforms)spriteUniforms.uOpacity.value=(data.baseOpacity||1)*(1-settle);if(data.shadow){data.shadow.scale.x=1+settle*.22;data.shadow.material.opacity=.4*(1-settle*.35)}if(t>=1){enemy.mesh.visible=false;enemy.deathVisualDone=true}}
+  }
 
   updateEnemies(dt){
     const livingUnits=this.units.filter((unit)=>unit.alive);if(!livingUnits.length)return;const now=performance.now();
@@ -393,7 +397,7 @@ export class Game {
   }
 
   updateEffects(dt){this.effects=this.effects.filter((effect)=>{if(effect.update(dt)){effect.destroy();return false}return true})}
-  cleanup(){this.enemies=this.enemies.filter((enemy)=>{if(enemy.alive)return true;this.scene.remove(enemy.mesh);enemy.mesh.traverse((child)=>{child.geometry?.dispose?.();if(child.material){if(Array.isArray(child.material))child.material.forEach((material)=>material.dispose());else child.material.dispose()}});return false})}
+  cleanup(){this.enemies=this.enemies.filter((enemy)=>{if(enemy.alive||!enemy.deathVisualDone)return true;this.scene.remove(enemy.mesh);enemy.mesh.traverse((child)=>{child.geometry?.dispose?.();if(child.material){if(Array.isArray(child.material))child.material.forEach((material)=>material.dispose());else child.material.dispose()}});return false})}
 
   openUpgrade(carrierId=null){if(carrierId)this.selectedId=carrierId;this.setModalPaused(true);const choices=getUpgradeChoices(3,{progress:this.elapsed/TOTAL_TIME});this.events.onUpgrade?.(choices,this.snapshot());this.feed('A page tears itself from the claimed reliquary.',true)}
   applyUpgrade(upgrade,unitId){const unit=this.units.find((item)=>item.id===unitId&&item.alive);if(!unit)return null;upgrade.apply(unit);unit.hp=Math.min(unit.maxHp,unit.hp+unit.maxHp*.1);unit.shield+=unit.maxHp*.04;unit.ap=Math.min(unit.maxAp,unit.ap+unit.maxAp*.25);this.appliedUpgradeIds.add(upgrade.id);discoverRite(this.chronicle,upgrade.id);this.selectedId=unit.id;this.audio.play('upgradeBinding');this.effects.push(createParticleBurst(this.scene,unit.x,unit.y,0xd6504f,20,1.5,'ritual'));this.feed(`<strong>${unit.name}</strong> receives ${upgrade.shortName}; the binding rekindles flesh, ward, and will.`,true);const snapshot=this.snapshot();this.events.onRoster?.(snapshot);this.events.onHud?.(snapshot);this.events.onDiscovery?.(snapshot);return unit}

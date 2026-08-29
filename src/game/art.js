@@ -240,7 +240,7 @@ export function createSkeletonVisual(enemy){
   if(enemy.elite){enemy.affixes.forEach((affix,index)=>{const mark=polygon([[0,.11],[.08,0],[0,-.11],[-.08,0]],affix.color,.92);mark.position.set((index-(enemy.affixes.length-1)/2)*.19,enemy.template.beast?.55:.88,.32);crown.add(mark)})}
   const baseScale=enemy.template.scale*(enemy.elite?1.04+enemy.affixes.length*.035:1);group.add(hp,ap,statusRing,shieldRing,eliteRing,crown);group.scale.setScalar(baseScale);
   const facingProfile=enemyFacingProfiles[enemy.type]||enemyFacingProfiles.thrall,inwardDirection=enemy.x>0?-1:1;
-  group.userData={hp,ap,statusRing,shieldRing,eliteRing,crown,body,sprite,phase:Math.random()*8,baseScale,baseOpacity:enemy.template.phase?.72:1,facing:inwardDirection*facingProfile.native};prepareDepthSortedVisual(group);return group;
+  group.userData={hp,ap,statusRing,shieldRing,eliteRing,crown,shadow,body,sprite,phase:Math.random()*8,baseScale,baseOpacity:enemy.template.phase?.72:1,facing:inwardDirection*facingProfile.native};prepareDepthSortedVisual(group);return group;
 }
 
 export function createTreasureVisual(){
@@ -324,8 +324,11 @@ export function createEnemyIntent(scene,enemy,target,color,duration,kind='melee'
 }
 
 export function createCorpseDecal(scene,x,y,type){
-  const group=new THREE.Group(),sprite=rigidAtlasPlane('/assets/undead-remains-atlas.png',4,3),index=Math.max(0,enemyArtOrder.indexOf(type)),large=type==='giant'||type==='ossuary',small=type==='hound';
-  sprite.userData.setAnimationFrame(index);sprite.scale.set(large?2.55:small?1.45:1.85,large?1.92:small?1.08:1.39,1);group.add(sprite);group.rotation.z=(Math.random()-.5)*.36;group.position.set(x,y,-.66);group.traverse((object)=>{object.renderOrder=-20000});scene.add(group);return{age:0,duration:18,update(dt){this.age+=dt;sprite.userData.setOpacity(this.age<=14?1:Math.max(0,1-(this.age-14)/4));return this.age>=this.duration},destroy(){scene.remove(group);disposeObject(group)}}
+  const group=new THREE.Group(),sprite=rigidAtlasPlane('/assets/undead-remains-atlas.png',4,3),index=Math.max(0,enemyArtOrder.indexOf(type)),large=type==='giant'||type==='ossuary',small=type==='hound',baseX=large?2.55:small?1.45:1.85,baseY=large?1.92:small?1.08:1.39,stain=ellipse((large?1.05:small?.58:.78),(large?.35:small?.18:.26),flat(0x050507,0),36),collapse=animatedEffect('impact',0xb8aa95,.38),dustGroup=new THREE.Group(),splinters=[],splinterCount=large?6:small?3:4;
+  sprite.userData.setAnimationFrame(index);sprite.userData.setOpacity(0);sprite.scale.set(baseX*.82,baseY*.5,1);sprite.position.y=.14;stain.position.z=-.04;collapse.scale.set(large?2.15:small?1.1:1.55,large?1.45:small?.72:1.02,1);collapse.position.z=.06;stain.renderOrder=sprite.renderOrder=-20000;collapse.renderOrder=-9000;
+  for(let shard=0;shard<splinterCount;shard+=1){const angle=shard/splinterCount*Math.PI*2+.18,mark=polygon([[0,.075],[.026,0],[0,-.075],[-.026,0]],shard%2?0xb8aa95:0x73695e,.66);mark.position.set(Math.cos(angle)*.18,Math.sin(angle)*.12,.1);mark.rotation.z=angle*.7;mark.renderOrder=-8999;mark.userData={angle,originX:mark.position.x,originY:mark.position.y};dustGroup.add(mark);splinters.push(mark)}
+  group.add(stain,sprite,collapse,dustGroup);group.rotation.z=(Math.random()-.5)*.36;group.position.set(x,y,-.66);scene.add(group);
+  return{age:0,duration:18,update(dt){this.age+=dt;const settle=Math.min(1,this.age/.32),ease=1-Math.pow(1-settle,3);sprite.userData.setOpacity(this.age<=14?ease:Math.max(0,1-(this.age-14)/4));sprite.scale.set(baseX*(.82+ease*.18),baseY*(.5+ease*.5),1);sprite.position.y=.14*(1-ease);stain.material.opacity=.1*ease*(this.age<=14?1:Math.max(0,1-(this.age-14)/4));stain.scale.setScalar(.7+ease*.3);if(this.age<.64){const dustT=Math.min(1,this.age/.62);animateEffect(collapse,Math.min(.999,this.age/.48),.38*(1-dustT));collapse.scale.multiplyScalar(1+dt*.42);splinters.forEach((mark,shard)=>{const travel=dustT*(large?.42:small?.2:.3);mark.position.x=mark.userData.originX+Math.cos(mark.userData.angle)*travel;mark.position.y=mark.userData.originY+Math.sin(mark.userData.angle)*travel+dustT*.16;mark.rotation.z+=dt*(shard%2?4.4:-3.8);mark.material.opacity=.66*(1-dustT)})}else if(collapse.visible){collapse.visible=false;dustGroup.visible=false}return this.age>=this.duration},destroy(){scene.remove(group);disposeObject(group)}}
 }
 
 const floatingTextStyles={
