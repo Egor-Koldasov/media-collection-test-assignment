@@ -23,7 +23,7 @@ Before starting any work, fork into a separate branch.
 - If the result satisfies the task – commit the changes. Include the iteration number into the commit message.
 - When iterating over the previous attempt, compare it with the previous work. If the attempt is not good, you can revert it back. You can even try doing it again if you think it can get better next time.
 - Write a statement describing the iteration results starting with "ITERATION n FINISHED.". Follow it with the description. Was it applied or was it discarded? What was done during this iteration?
-- Do the analysis on what can be improved in the work that you just did. It can include additional changes or involve redoing some work you just did from scratch.
+- Do the analysis on what can be improved in the work that you just did. It can include additional changes or involve redoing some work you just did from scratch. Do it yourself and run two subagents, one with the task of reviewing you work and one with the task of searching for further improvements.
 - If you see any path for progression, start the next iteration. This forms a progression loop. Continue repeating the process starting from the first step "Write an iteration statement...".
 - Finish when you don't see any way to improve the work further, or you cannot make it better.
 
