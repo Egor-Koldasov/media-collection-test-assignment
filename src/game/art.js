@@ -6,7 +6,7 @@ const circle=(radius,material,segments=32)=>new THREE.Mesh(new THREE.CircleGeome
 const ellipse=(rx,ry,material,segments=32)=>{const mesh=circle(1,material,segments);mesh.scale.set(rx,ry,1);return mesh};
 
 function softEllipse(rx,ry,color,opacity=.12){
-  const material=new THREE.ShaderMaterial({uniforms:{uColor:{value:new THREE.Color(color)},uOpacity:{value:opacity}},transparent:true,depthWrite:false,depthTest:true,blending:THREE.AdditiveBlending,toneMapped:false,side:THREE.DoubleSide,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`varying vec2 vUv;uniform vec3 uColor;uniform float uOpacity;void main(){vec2 p=(vUv-.5)*2.;float d=dot(p,p);float falloff=pow(max(0.,1.-smoothstep(.04,1.,d)),1.45);if(falloff<.008)discard;gl_FragColor=vec4(uColor,falloff*uOpacity);}`});
+  const material=new THREE.ShaderMaterial({uniforms:{uColor:{value:new THREE.Color(color)},uOpacity:{value:opacity}},transparent:true,depthWrite:false,depthTest:true,blending:THREE.AdditiveBlending,toneMapped:false,side:THREE.DoubleSide,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`varying vec2 vUv;uniform vec3 uColor;uniform float uOpacity;void main(){vec2 p=(vUv-.5)*2.;float d=dot(p,p);float falloff=pow(max(0.,1.-smoothstep(.04,1.,d)),1.45);if(falloff<.008)discard;gl_FragColor=linearToOutputTexel(vec4(uColor,falloff*uOpacity));}`});
   const mesh=plane(rx*2,ry*2,material);mesh.userData.radialUniforms=material.uniforms;return mesh;
 }
 
@@ -54,6 +54,20 @@ const enemyVisualGrades={
   ossuary:{color:0xb59d75,amount:.19,lift:.027},
   giant:{color:0xd0a467,amount:.24,lift:.035}
 };
+const enemySpriteProfiles={
+  thrall:{scale:1,anchorY:0,frames:[[0,0],[.065,.029],[-.036,.029],[-.017,-.076]]},
+  hound:{scale:1.1,anchorY:.106,frames:[[0,0],[.076,.035],[-.045,-.006],[.14,-.029]]},
+  pikeman:{scale:1,anchorY:0,frames:[[0,0],[.03,-.012],[-.095,-.041],[-.005,-.129]]},
+  bowman:{scale:1,anchorY:0,frames:[[0,0],[.116,-.006],[.055,-.018],[.047,-.029]]},
+  harvester:{scale:1,anchorY:0,frames:[[0,0],[.03,-.023],[-.018,-.064],[.018,-.076]]},
+  graveguard:{scale:1,anchorY:0,frames:[[0,0],[-.007,-.023],[.048,-.012],[-.039,-.1]]},
+  cantor:{scale:1.05,anchorY:.053,frames:[[0,0],[-.14,-.006],[-.033,0],[-.13,-.094]]},
+  standard:{scale:1,anchorY:0,frames:[[0,0],[.018,.006],[-.05,-.006],[.121,-.111]]},
+  wraith:{scale:1,anchorY:0,frames:[[0,0],[.14,-.029],[.053,-.006],[-.06,.053]]},
+  bishop:{scale:1,anchorY:0,frames:[[0,0],[-.058,-.018],[-.026,-.029],[.005,0]]},
+  ossuary:{scale:1,anchorY:0,frames:[[0,0],[-.012,-.006],[-.016,0],[.111,.035]]},
+  giant:{scale:.96,anchorY:-.042,frames:[[0,0],[.069,-.023],[.116,-.012],[.079,.018]]}
+};
 
 function atlasTexture(path){
   if(typeof window==='undefined')return null;
@@ -93,15 +107,15 @@ function animatedAtlasPlane(path,columns,rows,frameCell,opacity=1,grade=null){
       vec4 painted=texture2D(uMap,(vUv+uCell)/uAtlas);if(painted.a<.025)discard;
       const vec3 luma=vec3(.2126,.7152,.0722);float luminance=dot(painted.rgb,luma),gradeLuminance=max(.08,dot(uGradeColor,luma)),gradeMask=smoothstep(.06,.58,luminance);vec3 normalizedTint=uGradeColor/gradeLuminance;
       painted.rgb=mix(painted.rgb,painted.rgb*normalizedTint,uGradeAmount*gradeMask)+uGradeColor*uGradeLift*(.45+.55*gradeMask);
-      painted.rgb=clamp(painted.rgb+vec3(.24,.065,.035)*uAction*(.35+.65*vUv.y),0.,1.);
-      gl_FragColor=vec4(painted.rgb,painted.a*uOpacity);
+      painted.rgb=clamp(painted.rgb+vec3(.055,.012,.006)*uAction*(.35+.65*vUv.y),0.,1.);
+      gl_FragColor=linearToOutputTexel(vec4(painted.rgb,painted.a*uOpacity));
     }`});
   const sprite=new THREE.Mesh(new THREE.PlaneGeometry(1,1,12,18),material);sprite.userData.spriteUniforms=uniforms;sprite.userData.animationFrame=-1;sprite.userData.setAnimationFrame=(frame)=>{if(sprite.userData.animationFrame===frame)return;const [nextColumn,nextRow]=resolveCell(frame);uniforms.uCell.value.set(nextColumn,rows-nextRow-1);sprite.userData.animationFrame=frame};sprite.userData.setAnimationFrame(0);return sprite;
 }
 
 function rigidAtlasPlane(path,columns,rows){
   const uniforms={uMap:{value:atlasTexture(path)},uAtlas:{value:new THREE.Vector2(columns,rows)},uCell:{value:new THREE.Vector2(0,rows-1)},uTint:{value:new THREE.Color(0xffffff)},uLift:{value:0},uOpacity:{value:1}};
-  const material=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`varying vec2 vUv;uniform sampler2D uMap;uniform vec2 uAtlas;uniform vec2 uCell;uniform vec3 uTint;uniform float uLift;uniform float uOpacity;void main(){vec4 painted=texture2D(uMap,(vUv+uCell)/uAtlas);if(painted.a<.025)discard;vec3 lifted=clamp(painted.rgb*uTint+vec3(uLift),0.,1.);gl_FragColor=vec4(lifted,painted.a*uOpacity);}`});
+  const material=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`varying vec2 vUv;uniform sampler2D uMap;uniform vec2 uAtlas;uniform vec2 uCell;uniform vec3 uTint;uniform float uLift;uniform float uOpacity;void main(){vec4 painted=texture2D(uMap,(vUv+uCell)/uAtlas);if(painted.a<.025)discard;vec3 lifted=clamp(painted.rgb*uTint+vec3(uLift),0.,1.);gl_FragColor=linearToOutputTexel(vec4(lifted,painted.a*uOpacity));}`});
   const sprite=new THREE.Mesh(new THREE.PlaneGeometry(1,1),material);sprite.userData.animationFrame=-1;sprite.userData.setAnimationFrame=(frame)=>{const next=Math.max(0,Math.min(columns*rows-1,frame));if(sprite.userData.animationFrame===next)return;uniforms.uCell.value.set(next%columns,rows-Math.floor(next/columns)-1);sprite.userData.animationFrame=next};sprite.userData.setOpacity=(opacity)=>{uniforms.uOpacity.value=opacity};sprite.userData.setAnimationFrame(0);return sprite;
 }
 
@@ -196,7 +210,7 @@ function makeBar(width,color){
       color=mix(color,uFillColor,filled);alpha=mix(alpha,1.,filled);
       float gleam=filled*smoothstep(.61,.61+aaY,vUv.y)*smoothstep(.31,.31+aaY,1.-vUv.y);
       color=mix(color,vec3(.937,.894,.82),gleam*.16);
-      gl_FragColor=vec4(color,alpha);
+      gl_FragColor=linearToOutputTexel(vec4(color,alpha));
     }`});
   const bar=plane(width+.09,.094,material);bar.userData.barUniforms=uniforms;return bar;
 }
@@ -254,12 +268,12 @@ function createHumanoidSkeleton(enemy,bone){
 }
 
 export function createSkeletonVisual(enemy){
-  const group=new THREE.Group();const shadow=ellipse(.62,.22,flat(0x000000,.4),24);shadow.position.set(0,-.72,-.1);const body=new THREE.Group(),artIndex=Math.max(0,enemyArtOrder.indexOf(enemy.type)),baseColumn=artIndex%4*2,baseRow=Math.floor(artIndex/4)*2,frameOffsets=[[0,0],[1,0],[0,1],[1,1]],baseGrade=enemyVisualGrades[enemy.type]||enemyVisualGrades.thrall,gradeColor=new THREE.Color(baseGrade.color);if(enemy.elite)gradeColor.lerp(new THREE.Color(enemy.affixColor),.16);const sprite=animatedAtlasPlane('/assets/undead-animation-v2.png',8,6,(frame)=>[baseColumn+frameOffsets[frame][0],baseRow+frameOffsets[frame][1]],enemy.template.phase?.72:1,{color:gradeColor,amount:baseGrade.amount+(enemy.elite?.025:0),lift:baseGrade.lift+(enemy.elite?.006:0)});sprite.scale.set(1.84,2.45,1);sprite.position.set(0,0,.14);body.add(sprite);group.add(shadow,body);
+  const group=new THREE.Group();const shadow=ellipse(.62,.22,flat(0x000000,.4),24);shadow.position.set(0,-.72,-.1);const body=new THREE.Group(),artIndex=Math.max(0,enemyArtOrder.indexOf(enemy.type)),baseColumn=artIndex%4*2,baseRow=Math.floor(artIndex/4)*2,frameOffsets=[[0,0],[1,0],[0,1],[1,1]],baseGrade=enemyVisualGrades[enemy.type]||enemyVisualGrades.thrall,spriteProfile=enemySpriteProfiles[enemy.type]||enemySpriteProfiles.thrall,gradeColor=new THREE.Color(baseGrade.color);if(enemy.elite)gradeColor.lerp(new THREE.Color(enemy.affixColor),.16);const sprite=animatedAtlasPlane('/assets/undead-animation-v2.png',8,6,(frame)=>[baseColumn+frameOffsets[frame][0],baseRow+frameOffsets[frame][1]],enemy.template.phase?.72:1,{color:gradeColor,amount:baseGrade.amount+(enemy.elite?.025:0),lift:baseGrade.lift+(enemy.elite?.006:0)});sprite.scale.set(1.84*spriteProfile.scale,2.45*spriteProfile.scale,1);sprite.position.set(0,spriteProfile.anchorY,.14);body.add(sprite);group.add(shadow,body);
   const hp=makeBar(.88,0x9e2d33);hp.position.set(0,-1.18,.3);hp.visible=enemy.elite||enemy.type!=='thrall'&&enemy.type!=='hound';const ap=makeBar(.88,0x737eaa);ap.position.set(0,-1.28,.3);ap.visible=enemy.elite||enemy.template.ranged||enemy.template.aura||enemy.template.bishop||enemy.template.giant;const statusRing=ellipseLoop(.62,.44,0x8faac3,0,40);statusRing.position.set(0,-.27,.25);const shieldRing=ellipseLoop(.68,.49,0x91a7c8,0,44);shieldRing.position.set(0,-.27,.27);const eliteRing=ellipseLoop(.76,.54,enemy.affixColor,enemy.elite?.48:0,48);eliteRing.position.set(0,-.27,.23);const crown=new THREE.Group();
   if(enemy.elite){enemy.affixes.forEach((affix,index)=>{const mark=polygon([[0,.11],[.08,0],[0,-.11],[-.08,0]],affix.color,.92);mark.position.set((index-(enemy.affixes.length-1)/2)*.19,enemy.template.beast?.55:.88,.32);crown.add(mark)})}
   const baseScale=enemy.template.scale*(enemy.elite?1.04+enemy.affixes.length*.035:1);group.add(hp,ap,statusRing,shieldRing,eliteRing,crown);group.scale.setScalar(baseScale);
   const facingProfile=enemyFacingProfiles[enemy.type]||enemyFacingProfiles.thrall,inwardDirection=enemy.x>0?-1:1;
-  group.userData={hp,ap,statusRing,shieldRing,eliteRing,crown,shadow,body,sprite,phase:Math.random()*8,baseScale,baseOpacity:enemy.template.phase?.72:1,facing:inwardDirection*facingProfile.native};prepareDepthSortedVisual(group);return group;
+  group.userData={hp,ap,statusRing,shieldRing,eliteRing,crown,shadow,body,sprite,spriteProfile,phase:Math.random()*8,baseScale,baseOpacity:enemy.template.phase?.72:1,facing:inwardDirection*facingProfile.native};prepareDepthSortedVisual(group);return group;
 }
 
 export function createTreasureVisual(){
@@ -278,7 +292,7 @@ export function disposeTreasureVisual(group){
 export function updateEntityVisual(entity,selected=false,time=0){
   if(!entity.mesh)return;entity.mesh.position.set(entity.x,entity.y,entity.kind==='hero'?.12:.08);setVisualDepth(entity.mesh,-10000-Math.round(entity.y*100));const ratio=Math.max(0,entity.hp/entity.maxHp);const hpBar=entity.mesh.userData.hp;setBarValue(hpBar,ratio);
   const speed=Math.hypot(entity.vx||0,entity.vy||0),motion=Math.min(1,speed/1.6),sprite=entity.mesh.userData.sprite,spriteUniforms=sprite?.userData?.spriteUniforms,phase=entity.visualPhase??entity.mesh.userData.phase??0,cadence=time*(entity.kind==='hero'?.0092:.0076)+phase,stride=Math.sin(cadence*Math.PI/2),previousVx=entity.mesh.userData.previousVx??entity.vx??0,acceleration=(entity.vx||0)-previousVx;entity.mesh.userData.previousVx=entity.vx||0;const facingProfile=entity.kind==='hero'?null:enemyFacingProfiles[entity.type]||enemyFacingProfiles.thrall,targetFacingX=entity.pendingTargetId!=null&&Number.isFinite(entity.pendingTargetX)?entity.pendingTargetX-entity.x:entity.visualTargetX,committedFacing=entity.kind==='enemy'&&entity.attackWindup>0&&Math.abs(targetFacingX||0)>.04,facingX=committedFacing?targetFacingX:Math.abs(entity.vx||0)>.04?entity.vx:targetFacingX;if(Math.abs(facingX||0)>.04){const direction=facingX<0?-1:1;entity.mesh.userData.facing=entity.kind==='hero'?direction:direction*facingProfile.native}const facing=entity.mesh.userData.facing??(entity.kind==='hero'?1:facingProfile.native),lean=Math.max(-1,Math.min(1,(entity.vx||0)*.28+acceleration*1.7));
-  const action=entity.kind==='hero'?entity.mesh.userData.castPulse||0:entity.attackWindup>0?Math.min(1,.42+entity.attackWindup):0,gaitFrames=[1,0,2,0],frame=action>.16?3:motion>.075?gaitFrames[Math.floor(cadence)%gaitFrames.length]:0;sprite?.userData?.setAnimationFrame?.(frame);
+  const action=entity.kind==='hero'?entity.mesh.userData.castPulse||0:entity.attackWindup>0?Math.min(1,.42+entity.attackWindup):0,gaitFrames=[1,0,2,0],frame=action>.16?3:motion>.075?gaitFrames[Math.floor(cadence)%gaitFrames.length]:0;sprite?.userData?.setAnimationFrame?.(frame);const spriteProfile=entity.mesh.userData.spriteProfile,registration=spriteProfile?.frames?.[frame];if(registration)sprite.position.set(registration[0]*spriteProfile.scale,spriteProfile.anchorY+registration[1]*spriteProfile.scale,.14);
   if(spriteUniforms){spriteUniforms.uTime.value=time*.001;spriteUniforms.uMotion.value=motion;spriteUniforms.uAction.value=action;spriteUniforms.uStride.value=stride;spriteUniforms.uLean.value=lean}
   if(entity.kind==='hero'){
     const apRatio=Math.max(0,entity.ap/entity.maxAp),apBar=entity.mesh.userData.ap,body=entity.mesh.userData.body;setBarValue(apBar,apRatio);hpBar.position.y=selected?-.78:-.78;apBar.position.y=selected?-.92:-.9;hpBar.scale.set(selected?1.04:1,selected?1.08:1,1);apBar.scale.set(selected?1.04:1,selected?1.08:1,1);setBarColors(hpBar,selected?0x6bb57f:0x4f9d67,selected?0x1d1711:0x050609);setBarColors(apBar,selected?0x98a3d2:0x7e89bd,selected?0x1d1711:0x050609);entity.mesh.userData.selectedWash.material.opacity=selected?.13:0;entity.mesh.userData.selectedBracket.material.opacity=selected?.78+Math.sin(time*.004+phase)*.1:0;body.scale.x=facing*(1+motion*Math.cos(cadence*Math.PI/2)*.018);body.scale.y=1+action*.028-motion*Math.abs(stride)*.012;body.rotation.z=-lean*facing*.028+stride*motion*.008;
