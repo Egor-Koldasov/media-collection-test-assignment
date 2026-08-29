@@ -40,6 +40,20 @@ const enemyFacingProfiles={
   ossuary:{native:-1},
   giant:{native:-1}
 };
+const enemyVisualGrades={
+  thrall:{color:0xd3c2a4,amount:.1,lift:.018},
+  hound:{color:0xc4a987,amount:.12,lift:.018},
+  pikeman:{color:0xaab8c8,amount:.19,lift:.027},
+  bowman:{color:0x93aac3,amount:.22,lift:.03},
+  harvester:{color:0xc1a47d,amount:.15,lift:.024},
+  graveguard:{color:0xa99b87,amount:.13,lift:.022},
+  cantor:{color:0xae8db7,amount:.23,lift:.032},
+  standard:{color:0xb7785d,amount:.24,lift:.027},
+  wraith:{color:0x9db8d7,amount:.31,lift:.045},
+  bishop:{color:0xbd98c7,amount:.26,lift:.038},
+  ossuary:{color:0xb59d75,amount:.19,lift:.027},
+  giant:{color:0xd0a467,amount:.24,lift:.035}
+};
 
 function atlasTexture(path){
   if(typeof window==='undefined')return null;
@@ -47,8 +61,8 @@ function atlasTexture(path){
   let texture;texture=new THREE.TextureLoader().load(path,()=>{texture.userData.atlasReady=true;texture.userData.atlasReadyCallbacks.splice(0).forEach((callback)=>callback(texture))});texture.userData.atlasReady=false;texture.userData.atlasReadyCallbacks=[];texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.ClampToEdgeWrapping;texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;texture.anisotropy=8;atlasTextureCache.set(path,texture);return texture;
 }
 
-function animatedAtlasPlane(path,columns,rows,frameCell,opacity=1){
-  const resolveCell=typeof frameCell==='function'?frameCell:()=>[frameCell%columns,Math.floor(frameCell/columns)],[column,row]=resolveCell(0),uniforms={uMap:{value:atlasTexture(path)},uAtlas:{value:new THREE.Vector2(columns,rows)},uCell:{value:new THREE.Vector2(column,rows-row-1)},uTime:{value:0},uMotion:{value:0},uAction:{value:0},uStride:{value:0},uLean:{value:0},uPhase:{value:Math.random()*9},uOpacity:{value:opacity}};
+function animatedAtlasPlane(path,columns,rows,frameCell,opacity=1,grade=null){
+  const resolveCell=typeof frameCell==='function'?frameCell:()=>[frameCell%columns,Math.floor(frameCell/columns)],[column,row]=resolveCell(0),uniforms={uMap:{value:atlasTexture(path)},uAtlas:{value:new THREE.Vector2(columns,rows)},uCell:{value:new THREE.Vector2(column,rows-row-1)},uTime:{value:0},uMotion:{value:0},uAction:{value:0},uStride:{value:0},uLean:{value:0},uPhase:{value:Math.random()*9},uOpacity:{value:opacity},uGradeColor:{value:grade?.color?.isColor?grade.color:new THREE.Color(grade?.color??0xffffff)},uGradeAmount:{value:grade?.amount||0},uGradeLift:{value:grade?.lift||0}};
   const material=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,vertexShader:`
     varying vec2 vUv;
     uniform float uTime;
@@ -72,9 +86,14 @@ function animatedAtlasPlane(path,columns,rows,frameCell,opacity=1){
     uniform vec2 uCell;
     uniform float uAction;
     uniform float uOpacity;
+    uniform vec3 uGradeColor;
+    uniform float uGradeAmount;
+    uniform float uGradeLift;
     void main(){
       vec4 painted=texture2D(uMap,(vUv+uCell)/uAtlas);if(painted.a<.025)discard;
-      painted.rgb+=vec3(.24,.065,.035)*uAction*(.35+.65*vUv.y);
+      const vec3 luma=vec3(.2126,.7152,.0722);float luminance=dot(painted.rgb,luma),gradeLuminance=max(.08,dot(uGradeColor,luma)),gradeMask=smoothstep(.06,.58,luminance);vec3 normalizedTint=uGradeColor/gradeLuminance;
+      painted.rgb=mix(painted.rgb,painted.rgb*normalizedTint,uGradeAmount*gradeMask)+uGradeColor*uGradeLift*(.45+.55*gradeMask);
+      painted.rgb=clamp(painted.rgb+vec3(.24,.065,.035)*uAction*(.35+.65*vUv.y),0.,1.);
       gl_FragColor=vec4(painted.rgb,painted.a*uOpacity);
     }`});
   const sprite=new THREE.Mesh(new THREE.PlaneGeometry(1,1,12,18),material);sprite.userData.spriteUniforms=uniforms;sprite.userData.animationFrame=-1;sprite.userData.setAnimationFrame=(frame)=>{if(sprite.userData.animationFrame===frame)return;const [nextColumn,nextRow]=resolveCell(frame);uniforms.uCell.value.set(nextColumn,rows-nextRow-1);sprite.userData.animationFrame=frame};sprite.userData.setAnimationFrame(0);return sprite;
@@ -235,7 +254,7 @@ function createHumanoidSkeleton(enemy,bone){
 }
 
 export function createSkeletonVisual(enemy){
-  const group=new THREE.Group();const shadow=ellipse(.62,.22,flat(0x000000,.4),24);shadow.position.set(0,-.72,-.1);const body=new THREE.Group(),artIndex=Math.max(0,enemyArtOrder.indexOf(enemy.type)),baseColumn=artIndex%4*2,baseRow=Math.floor(artIndex/4)*2,frameOffsets=[[0,0],[1,0],[0,1],[1,1]],sprite=animatedAtlasPlane('/assets/undead-animation-v2.png',8,6,(frame)=>[baseColumn+frameOffsets[frame][0],baseRow+frameOffsets[frame][1]],enemy.template.phase?.72:1);sprite.scale.set(1.84,2.45,1);sprite.position.set(0,0,.14);body.add(sprite);group.add(shadow,body);
+  const group=new THREE.Group();const shadow=ellipse(.62,.22,flat(0x000000,.4),24);shadow.position.set(0,-.72,-.1);const body=new THREE.Group(),artIndex=Math.max(0,enemyArtOrder.indexOf(enemy.type)),baseColumn=artIndex%4*2,baseRow=Math.floor(artIndex/4)*2,frameOffsets=[[0,0],[1,0],[0,1],[1,1]],baseGrade=enemyVisualGrades[enemy.type]||enemyVisualGrades.thrall,gradeColor=new THREE.Color(baseGrade.color);if(enemy.elite)gradeColor.lerp(new THREE.Color(enemy.affixColor),.16);const sprite=animatedAtlasPlane('/assets/undead-animation-v2.png',8,6,(frame)=>[baseColumn+frameOffsets[frame][0],baseRow+frameOffsets[frame][1]],enemy.template.phase?.72:1,{color:gradeColor,amount:baseGrade.amount+(enemy.elite?.025:0),lift:baseGrade.lift+(enemy.elite?.006:0)});sprite.scale.set(1.84,2.45,1);sprite.position.set(0,0,.14);body.add(sprite);group.add(shadow,body);
   const hp=makeBar(.88,0x9e2d33);hp.position.set(0,-1.18,.3);hp.visible=enemy.elite||enemy.type!=='thrall'&&enemy.type!=='hound';const ap=makeBar(.88,0x737eaa);ap.position.set(0,-1.28,.3);ap.visible=enemy.elite||enemy.template.ranged||enemy.template.aura||enemy.template.bishop||enemy.template.giant;const statusRing=ellipseLoop(.62,.44,0x8faac3,0,40);statusRing.position.set(0,-.27,.25);const shieldRing=ellipseLoop(.68,.49,0x91a7c8,0,44);shieldRing.position.set(0,-.27,.27);const eliteRing=ellipseLoop(.76,.54,enemy.affixColor,enemy.elite?.48:0,48);eliteRing.position.set(0,-.27,.23);const crown=new THREE.Group();
   if(enemy.elite){enemy.affixes.forEach((affix,index)=>{const mark=polygon([[0,.11],[.08,0],[0,-.11],[-.08,0]],affix.color,.92);mark.position.set((index-(enemy.affixes.length-1)/2)*.19,enemy.template.beast?.55:.88,.32);crown.add(mark)})}
   const baseScale=enemy.template.scale*(enemy.elite?1.04+enemy.affixes.length*.035:1);group.add(hp,ap,statusRing,shieldRing,eliteRing,crown);group.scale.setScalar(baseScale);
