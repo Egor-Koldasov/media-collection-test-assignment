@@ -339,7 +339,7 @@ export class Game {
     if(enemy.template.splits){for(let i=0;i<enemy.template.splits;i+=1){const angle=i/enemy.template.splits*Math.PI*2;this.spawnEnemy('thrall',{x:enemy.x+Math.cos(angle)*.45,y:enemy.y+Math.sin(angle)*.45},[])}}
     if(this.pendingTreasureDrops>0){this.pendingTreasureDrops-=1;this.spawnTreasure(enemy.x,enemy.y)}
     if(enemy.elite)this.feed(`<strong>${enemy.name}</strong> is broken.`,true);
-    this.effects.push(createCorpseDecal(this.scene,enemy.x,enemy.y,enemy.type));this.audio.play('skeletonDeath',{gain:enemy.template.giant?1.24:1});
+    const corpse=createCorpseDecal(this.scene,enemy.x,enemy.y,enemy.type),remains=[corpse,...this.effects.filter((effect)=>effect.kind==='corpse').sort((a,b)=>a.age-b.age)];remains.forEach((effect,index)=>{effect.setProminent?.(index<8);if(index>=44)effect.forceFade?.()});this.effects.push(corpse);this.audio.play('skeletonDeath',{gain:enemy.template.giant?1.24:1});
   }
 
   heal(unit,amount,show=true){if(!unit?.alive||amount<=0)return;const missing=Math.max(0,unit.maxHp-unit.hp);const actual=Math.min(amount,missing);const overflow=Math.max(0,amount-actual);unit.hp=Math.min(unit.maxHp,unit.hp+amount);if(overflow>0&&unit.mods.overhealWard>0)unit.shield+=overflow*unit.mods.overhealWard;if(show&&actual>.2)this.queueCombatNumber(unit,actual,{kind:'heal',prefix:'+'})}
