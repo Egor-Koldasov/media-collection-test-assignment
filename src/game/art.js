@@ -332,14 +332,14 @@ export function createCorpseDecal(scene,x,y,type){
 }
 
 const floatingTextStyles={
-  damage:{canvas:[176,84],font:'700 38px Georgia',scale:[1.22,.46],height:.3,duration:.46,drift:.7,swell:.08},
-  critical:{canvas:[240,96],font:'700 43px Georgia',scale:[1.8,.64],height:.42,duration:.68,drift:.78,swell:.2},
-  wound:{canvas:[190,88],font:'700 39px Georgia',scale:[1.34,.5],height:.33,duration:.58,drift:.68,swell:.12},
-  heal:{canvas:[204,88],font:'700 37px Georgia',scale:[1.42,.52],height:.38,duration:.66,drift:.62,swell:.1},
-  ward:{canvas:[244,88],font:'700 34px Georgia',scale:[1.56,.52],height:.34,duration:.6,drift:.58,swell:.08},
-  system:{canvas:[360,112],font:'600 39px Georgia',scale:[2.35,.76],height:.46,duration:.72,drift:.9,swell:.25}
+  damage:{canvas:[176,84],font:'700 38px Georgia',scaleY:.46,height:.3,duration:.46,drift:.7,swell:.08},
+  critical:{canvas:[240,96],font:'700 43px Georgia',scaleY:.64,height:.42,duration:.68,drift:.78,swell:.2},
+  wound:{canvas:[190,88],font:'700 39px Georgia',scaleY:.5,height:.33,duration:.58,drift:.68,swell:.12},
+  heal:{canvas:[204,88],font:'700 37px Georgia',scaleY:.52,height:.38,duration:.66,drift:.62,swell:.1},
+  ward:{canvas:[244,88],font:'700 34px Georgia',scaleY:.52,height:.34,duration:.6,drift:.58,swell:.08},
+  system:{canvas:[360,112],font:'600 39px Georgia',scaleY:.76,height:.46,duration:.72,drift:.9,swell:.25}
 };
 
 export function createFloatingText(scene,text,x,y,color='#e8deca',kind='system',lane=0){
-  const style=floatingTextStyles[kind]||floatingTextStyles.system,canvas=document.createElement('canvas');canvas.width=style.canvas[0];canvas.height=style.canvas[1];const ctx=canvas.getContext('2d'),centerX=canvas.width/2,baseline=canvas.height*.6;ctx.font=style.font;ctx.textAlign='center';ctx.lineJoin='round';ctx.lineWidth=kind==='system'?5:4;ctx.strokeStyle='rgba(3,4,7,.9)';ctx.shadowColor='rgba(0,0,0,.95)';ctx.shadowBlur=kind==='system'?9:6;ctx.strokeText?.(text,centerX,baseline);ctx.fillStyle=color;ctx.fillText(text,centerX,baseline);const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.minFilter=THREE.LinearFilter;const material=new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:false,depthWrite:false}),sprite=new THREE.Sprite(material),baseScaleX=style.scale[0],baseX=x+lane*.13;sprite.scale.set(baseScaleX,style.scale[1],1);sprite.position.set(baseX,y+style.height,2);sprite.renderOrder=32000;scene.add(sprite);return{age:0,duration:style.duration,update(dt){this.age+=dt;const t=Math.min(1,this.age/this.duration),rise=1-Math.pow(1-t,2),fade=1-THREE.MathUtils.smoothstep(t,.38,1);sprite.position.y=y+style.height+rise*style.drift;sprite.position.x=baseX+lane*Math.sin(t*Math.PI)*.07;material.opacity=fade;sprite.scale.x=baseScaleX+Math.sin(t*Math.PI)*style.swell;return t>=1},destroy(){scene.remove(sprite);texture.dispose();material.dispose()}};
+  const style=floatingTextStyles[kind]||floatingTextStyles.system,canvas=document.createElement('canvas');canvas.width=style.canvas[0];canvas.height=style.canvas[1];const ctx=canvas.getContext('2d'),centerX=canvas.width/2,baseline=canvas.height*.6;ctx.font=style.font;ctx.textAlign='center';ctx.lineJoin='round';ctx.lineWidth=kind==='system'?5:4;ctx.strokeStyle='rgba(3,4,7,.9)';ctx.shadowColor='rgba(0,0,0,.95)';ctx.shadowBlur=kind==='system'?9:6;ctx.strokeText?.(text,centerX,baseline);ctx.fillStyle=color;ctx.fillText(text,centerX,baseline);const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.minFilter=THREE.LinearFilter;const material=new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:false,depthWrite:false}),sprite=new THREE.Sprite(material),baseScaleX=style.scaleY*canvas.width/canvas.height,baseX=x+lane*.13;sprite.scale.set(baseScaleX,style.scaleY,1);sprite.position.set(baseX,y+style.height,2);sprite.renderOrder=32000;scene.add(sprite);return{age:0,duration:style.duration,update(dt){this.age+=dt;const t=Math.min(1,this.age/this.duration),rise=1-Math.pow(1-t,2),fade=1-THREE.MathUtils.smoothstep(t,.38,1);sprite.position.y=y+style.height+rise*style.drift;sprite.position.x=baseX+lane*Math.sin(t*Math.PI)*.07;material.opacity=fade;sprite.scale.x=baseScaleX+Math.sin(t*Math.PI)*style.swell;return t>=1},destroy(){scene.remove(sprite);texture.dispose();material.dispose()}};
 }
